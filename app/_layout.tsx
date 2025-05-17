@@ -15,6 +15,18 @@ export default function RootLayout() {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="chat/[roomId]"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="chat/history"
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }

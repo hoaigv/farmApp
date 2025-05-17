@@ -1,9 +1,15 @@
-import { Text, View } from "react-native";
+// ✅ Cách đúng
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 
-export default function Index() {
+const MyPlantsScreen = () => {
   return (
-    <View className="flex-1 justify-center items-center ">
-      <Text className="text-5xl text-blue-500">Wellcome</Text>
+    <View>
+      <Text>Home</Text>
     </View>
   );
-}
+};
+
+export default MyPlantsScreen;
+
+const styles = StyleSheet.create({});

@@ -7,6 +7,12 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         tabBarShowLabel: false,
+        tabBarItemStyle: {
+          justifyContent: "center",
+          alignItems: "center",
+          width: "100%",
+          height: "100%",
+        },
         tabBarStyle: {
           height: 75,
           paddingBottom: 10,
@@ -26,32 +32,32 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "My Plants",
           headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
             <TabBarIcon
-              iconSet="AntDesign"
-              name="home"
+              iconSet="Entypo"
+              name="tree"
               color={color}
               size={size}
-              label="Home"
+              label="My Plants"
               focused={focused}
             />
           ),
         }}
       />
       <Tabs.Screen
-        name="diary"
+        name="forum"
         options={{
-          title: "Diary",
+          title: "Forum",
           headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
             <TabBarIcon
-              iconSet="FontAwesome"
-              name="book"
+              iconSet="Ionicons"
+              name="people-outline"
               color={color}
               size={size}
-              label="Diary"
+              label="Forum"
               focused={focused}
             />
           ),
@@ -68,24 +74,7 @@ export default function TabsLayout() {
               name="chatbubble-ellipses-outline"
               color={color}
               size={size}
-              label="Chat"
-              focused={focused}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="calendar"
-        options={{
-          title: "Calendar",
-          headerShown: false,
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabBarIcon
-              iconSet="AntDesign"
-              name="calendar"
-              color={color}
-              size={size}
-              label="Calendar"
+              label="Chat AI"
               focused={focused}
             />
           ),

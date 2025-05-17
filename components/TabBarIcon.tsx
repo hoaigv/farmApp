@@ -1,14 +1,15 @@
 // components/TabBarIcon.tsx
-import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
+import { AntDesign, Entypo, FontAwesome, Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-type IconSet = "AntDesign" | "Ionicons" | "FontAwesome";
+type IconSet = "AntDesign" | "Ionicons" | "FontAwesome" | "Entypo";
 
 const ICON_SETS = {
   AntDesign,
   Ionicons,
   FontAwesome,
+  Entypo,
 };
 
 interface TabBarIconProps {
@@ -30,7 +31,7 @@ export default function TabBarIcon({
   const IconComponent = ICON_SETS[iconSet];
 
   const activeColor = "white";
-  const inactiveColor = "#00C897";
+  const inactiveColor = "gray";
   const backgroundColor = focused ? "#00C897" : "transparent";
 
   return (
@@ -53,7 +54,7 @@ export default function TabBarIcon({
           style={[
             styles.label,
             {
-              color: focused ? "#00C897" : "#00C897", // bạn có thể thay đổi nếu muốn active khác inactive
+              color: focused ? "#00C897" : "gray", // bạn có thể thay đổi nếu muốn active khác inactive
               fontWeight: focused ? "bold" : "normal",
             },
           ]}
@@ -73,7 +74,7 @@ const styles = StyleSheet.create({
     height: 60,
   },
   iconContainer: {
-    padding: 10,
+    padding: 7.5,
     borderRadius: 25,
   },
   focusedContainer: {
@@ -81,6 +82,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 0,
   },
 });
