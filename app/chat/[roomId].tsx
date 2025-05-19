@@ -62,10 +62,10 @@ const ChatRoomScreen = () => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <SafeAreaView className="flex-1 bg-background">
       {/* HEADER giữ nguyên */}
 
-      <View className="flex-row items-center justify-between p-2 bg-white">
+      <View className="flex-row items-center justify-between px-2  pb-2 bg-white">
         <Ionicons
           name="arrow-back-outline"
           size={26}

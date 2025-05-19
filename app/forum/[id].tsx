@@ -1,14 +1,14 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-const DiaryDetail = () => {
+const ForumDetailScreen = () => {
   return (
     <View>
-      <Text>DiaryDetail</Text>
+      <Text>ForumDetailScreen</Text>
     </View>
   );
 };
 
-export default DiaryDetail;
+export default ForumDetailScreen;
 
 const styles = StyleSheet.create({});

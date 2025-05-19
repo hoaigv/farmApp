@@ -64,8 +64,8 @@ const ChatScreen = () => {
     return null; // or a loading indicator
   }
   return (
-    <SafeAreaView className="bg-white flex-1 flex-col">
-      <View className="items-center pt-6 pb-2">
+    <SafeAreaView className="flex-1 bg-background">
+      <View className="items-center px-2  pb-4">
         <Text style={styles.header_lable}>Chat With AI</Text>
       </View>
 
