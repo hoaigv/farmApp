@@ -32,12 +32,29 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          title: "Home",
+          headerShown: false,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon
+              iconSet="Ionicons"
+              name="home-outline"
+              color={color}
+              size={size}
+              label="Home"
+              focused={focused}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="plant"
+        options={{
           title: "My Plants",
           headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
             <TabBarIcon
               iconSet="Entypo"
-              name="tree"
+              name="leaf"
               color={color}
               size={size}
               label="My Plants"

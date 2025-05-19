@@ -134,7 +134,7 @@ const HistoryChatScreen = () => {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-background">
       <View className="flex-row items-center justify-center p-2 bg-white">
         <Ionicons
           name="arrow-back-outline"

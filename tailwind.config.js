@@ -16,6 +16,7 @@ module.exports = {
         secondary: "#f3f4f6",
         accent: "#4ade80",
         danger: "#dc2626",
+        background: "#fff",
       },
 
       fontSize: {

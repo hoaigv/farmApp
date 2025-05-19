@@ -1,11 +1,20 @@
+import { useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView, StyleSheet, Text, View } from "react-native";
+import useCustomFonts from "../../hook/FontLoader";
 
 const ForumScreen = () => {
+  const router = useRouter();
+  const [fontsLoaded] = useCustomFonts();
+  if (!fontsLoaded) {
+    return null; // or a loading indicator
+  }
   return (
-    <View>
-      <Text>ForumScreen</Text>
-    </View>
+    <SafeAreaView className="flex-1 bg-background">
+      <View>
+        <Text>My Plants</Text>
+      </View>
+    </SafeAreaView>
   );
 };
 
