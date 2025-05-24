@@ -27,7 +27,7 @@ const HomeScreen = () => {
       .map((task) =>
         task.id === id ? { ...task, completed: !task.completed } : task
       )
-      .sort((a, b) => Number(a.completed) - Number(b.completed)); // ✅ đã sửa lỗi
+      .sort((a, b) => Number(a.completed) - Number(b.completed));
 
     setTasks(updatedTasks);
   };
@@ -64,7 +64,7 @@ const HomeScreen = () => {
   };
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <View className="flex-row items-center justify-between px-2 py-2 relative">
+      <View className="flex-row items-center justify-between px-2 mb-2 relative">
         {/* Left: Location */}
         <WeatherCard />
         {/* Right: Notification */}
