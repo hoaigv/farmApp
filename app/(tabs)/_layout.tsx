@@ -64,23 +64,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="forum"
-        options={{
-          title: "Forum",
-          headerShown: false,
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabBarIcon
-              iconSet="Ionicons"
-              name="people-outline"
-              color={color}
-              size={size}
-              label="Forum"
-              focused={focused}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="chat"
         options={{
           title: "Chat",
@@ -97,6 +80,24 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="forum"
+        options={{
+          title: "Forum",
+          headerShown: false,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon
+              iconSet="Ionicons"
+              name="people-outline"
+              color={color}
+              size={size}
+              label="Forum"
+              focused={focused}
+            />
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="profile"
         options={{
