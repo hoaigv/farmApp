@@ -21,6 +21,18 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="forum/create"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="forum/history"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
             name="chat/[roomId]"
             options={{
               headerShown: false,
