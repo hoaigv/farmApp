@@ -1,22 +1,25 @@
 {
   "expo": {
+    "owner": "hoaigv",
     "name": "Agricultural App",
     "slug": "agricultural-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo_farm.png",
-    "scheme": "farmapp",
+    "scheme": "agricultural",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hoaigv.agriculturalapp"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo_farm.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.hoaigv.agriculturalapp"
     },
     "web": {
       "bundler": "metro",
@@ -34,7 +37,8 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
