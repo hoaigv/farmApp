@@ -11,12 +11,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import EditNameModal from "../../components/EditNameModal";
-import Header from "../../components/Header";
-import HealthStatusModal from "../../components/HealthStatusModal";
-import LocationModal from "../../components/LocationModal";
-import { initialReminders, Reminder } from "../../data/tasks";
-import useCustomFonts from "../../hook/FontLoader";
+import EditNameModal from "../../../../components/EditNameModal";
+import Header from "../../../../components//Header";
+import HealthStatusModal from "../../../../components/HealthStatusModal";
+import LocationModal from "../../../../components/LocationModal";
+import { initialReminders, Reminder } from "../../../../data/tasks";
+import useCustomFonts from "../../../../hook/FontLoader";
 
 const DetaiPlantScreen = () => {
   const router = useRouter();
@@ -97,8 +97,8 @@ const DetaiPlantScreen = () => {
             <Image
               source={
                 item.jobType === "watering"
-                  ? require("../../assets/images/drop.png")
-                  : require("../../assets/images/fertilizer.png")
+                  ? require("../../../../assets/images/drop.png")
+                  : require("../../../../assets/images/fertilizer.png")
               }
               resizeMode="cover"
               className="h-5 w-5"
@@ -108,7 +108,7 @@ const DetaiPlantScreen = () => {
 
           <View className="flex-row gap-1 items-center">
             <Image
-              source={require("../../assets/images/bell.png")}
+              source={require("../../../../assets/images/bell.png")}
               resizeMode="cover"
               className="h-4 w-4"
             />
@@ -176,13 +176,16 @@ const DetaiPlantScreen = () => {
             <TouchableOpacity onPress={() => handleSnooze(item)}>
               <Text className="text-yellow-600 font-semibold">🔁 Hoãn</Text>
             </TouchableOpacity>
-            <TouchableOpacity
+            {/* <TouchableOpacity
               onPress={() =>
+               {
                 router.push(`/plants/${item.plantId}/reminder/${item.id}`)
+                router.push(`/garden/${item.gardenId}/reminder/${item.id}`)
+               }
               }
             >
               <AntDesign name="edit" size={20} color="black" />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
       </TouchableOpacity>
@@ -192,25 +195,25 @@ const DetaiPlantScreen = () => {
   const getPlantImage = () => {
     switch (healthStatus) {
       case "healthy":
-        return require("../../assets/images/cardiogram.png");
+        return require("../../../../assets/images/cardiogram.png");
       case "harvest":
-        return require("../../assets/images/harvest.png");
+        return require("../../../../assets/images/harvest.png");
       case "sick":
-        return require("../../assets/images/warning.png");
+        return require("../../../../assets/images/warning.png");
       case "dead":
-        return require("../../assets/images/dead-tree.png");
+        return require("../../../../assets/images/dead-tree.png");
       default:
-        return require("../../assets/images/cardiogram.png");
+        return require("../../../../assets/images/cardiogram.png");
     }
   };
   const getLocationImage = () => {
     switch (locationStatus) {
       case "pot":
-        return require("../../assets/images/pots.png");
+        return require("../../../../assets/images/pots.png");
       case "garden":
-        return require("../../assets/images/spinach.png");
+        return require("../../../../assets/images/spinach.png");
       default:
-        return require("../../assets/images/pots.png");
+        return require("../../../../assets/images/pots.png");
     }
   };
   if (!fontsLoaded) return null;
@@ -256,17 +259,17 @@ const DetaiPlantScreen = () => {
               onPress={() => router.push("/chat/123")}
             >
               <Image
-                source={require("../../assets/images/generative.png")}
+                source={require("../../../../assets/images/generative.png")}
                 className="h-10 w-10"
                 resizeMode="cover"
               />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickActionItem}
-              onPress={() => router.push("/plants/123/chart")}
+              onPress={() => router.push("/garden/123/123/chart")}
             >
               <Image
-                source={require("../../assets/images/pie-chart.png")}
+                source={require("../../../../assets/images/pie-chart.png")}
                 className="h-10 w-10"
                 resizeMode="cover"
               />
@@ -294,7 +297,7 @@ const DetaiPlantScreen = () => {
           >
             <View style={styles.itemContext}>
               <Image
-                source={require("../../assets/images/leaves-2.png")}
+                source={require("../../../../assets/images/leaves-2.png")}
                 resizeMode="cover"
                 style={styles.itemImage}
               />
@@ -322,7 +325,7 @@ const DetaiPlantScreen = () => {
             </TouchableOpacity>
             <View style={styles.itemContext}>
               <Image
-                source={require("../../assets/images/drop.png")}
+                source={require("../../../../assets/images/drop.png")}
                 style={styles.itemImage}
                 resizeMode="cover"
               />
@@ -360,7 +363,7 @@ const DetaiPlantScreen = () => {
               Reminders :
             </Text>
             <View className="flex-row gap-10 items-center justify-center">
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 onPress={() => router.push("/plants/123/reminder/123")}
               >
                 <AntDesign
@@ -369,7 +372,7 @@ const DetaiPlantScreen = () => {
                   color="black"
                   className="font-bold"
                 />
-              </TouchableOpacity>
+              </TouchableOpacity> */}
               <TouchableOpacity>
                 <FontAwesome name="history" size={24} color="black" />
               </TouchableOpacity>

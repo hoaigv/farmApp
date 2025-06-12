@@ -70,7 +70,10 @@ export default function RootLayout() {
                 name="chat/history"
                 options={{ headerShown: false }}
               />
-              <Stack.Screen
+
+              <Stack.Screen name="garden" options={{ headerShown: false }} />
+
+              {/* <Stack.Screen
                 name="plants/[plantId]"
                 options={{ headerShown: false }}
               />
@@ -85,7 +88,7 @@ export default function RootLayout() {
               <Stack.Screen
                 name="plants/[plantId]/chart"
                 options={{ headerShown: false }}
-              />
+              /> */}
               <Stack.Screen
                 name="authentication/login"
                 options={{ headerShown: false }}
