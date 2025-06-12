@@ -25,7 +25,7 @@ import {
 } from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 import * as Yup from "yup";
-import useCustomFonts from "../../hook/FontLoader";
+import useCustomFonts from "../../../hook/FontLoader";
 
 const validationSchema = Yup.object().shape({
   plantName: Yup.string()

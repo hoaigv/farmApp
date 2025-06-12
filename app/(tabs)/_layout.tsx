@@ -47,9 +47,9 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="plant"
+        name="garden"
         options={{
-          title: "My Plants",
+          title: "Gardent",
           headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
             <TabBarIcon
@@ -57,7 +57,7 @@ export default function TabsLayout() {
               name="leaf"
               color={color}
               size={size}
-              label="My Plants"
+              label="Gardent"
               focused={focused}
             />
           ),
