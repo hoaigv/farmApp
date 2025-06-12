@@ -1,5 +1,5 @@
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+
 import React, { useState } from "react";
 import {
   FlatList,
@@ -19,7 +19,6 @@ import { gardeningTodos } from "../../data/todo";
 import useCustomFonts from "../../hook/FontLoader";
 import { Todo } from "../../types/todo";
 const HomeScreen = () => {
-  const router = useRouter();
   const [tasks, setTasks] = useState(gardeningTodos);
   const [fontsLoaded] = useCustomFonts();
   const toggleTask = (id: string) => {
