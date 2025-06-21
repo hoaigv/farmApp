@@ -47,9 +47,9 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="garden"
+        name="gardens"
         options={{
-          title: "Gardent",
+          title: "Gardens",
           headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
             <TabBarIcon
