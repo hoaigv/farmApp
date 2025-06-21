@@ -1,190 +1,173 @@
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-
 import React, { useState } from "react";
 import {
   FlatList,
-  Image,
   ImageBackground,
-  ListRenderItem,
   SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
+
 import { Avatar } from "react-native-paper";
 import NotificationBell from "../../components/NotificationBell";
 import WeatherCard from "../../components/WeatherCard";
-import { gardeningTodos } from "../../data/todo";
 import useCustomFonts from "../../hook/FontLoader";
-import { Todo } from "../../types/todo";
-const HomeScreen = () => {
-  const [tasks, setTasks] = useState(gardeningTodos);
-  const [fontsLoaded] = useCustomFonts();
-  const toggleTask = (id: string) => {
-    const updatedTasks = tasks
-      .map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-      .sort((a, b) => Number(a.completed) - Number(b.completed));
 
-    setTasks(updatedTasks);
-  };
+import TodoList from "../../components/TodoList";
+const ROWS = 6;
+const COLS = 6;
+const CELL_SIZE = (200 / COLS) * 0.97;
+
+type CellValue = string | null;
+type Status = "normal" | "warning" | "alert";
+type Note = {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  completed: boolean;
+  grid: CellValue[];
+};
+function generateGrid(total: number, filledCount: number): CellValue[] {
+  const arr: CellValue[] = Array(total).fill(null);
+  const indices = Array.from({ length: total }, (_, i) => i);
+  // shuffle chỉ số
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  const chosen = indices.slice(0, filledCount);
+  const options: Status[] = ["normal", "warning", "alert"];
+  chosen.forEach((idx) => {
+    arr[idx] = options[Math.floor(Math.random() * options.length)];
+  });
+  return arr;
+}
+
+// Sample grid statuses: green=normal, yellow=warning, red=alert
+const sampleNotes: Note[] = [
+  {
+    id: "1",
+    title: "Water Plants",
+    date: "2025-06-15",
+    time: "08:00",
+    completed: false,
+    grid: generateGrid(ROWS * COLS, 28),
+  },
+  {
+    id: "2",
+    title: "Fertilize",
+    date: "2025-06-15",
+    time: "10:00",
+    completed: true,
+    grid: generateGrid(ROWS * COLS, 28),
+  },
+  {
+    id: "3",
+    title: "Fertilize",
+    date: "2025-06-15",
+    time: "10:00",
+    completed: false,
+    grid: generateGrid(ROWS * COLS, 25),
+  },
+];
+
+const HomeScreen = () => {
+  const [notes, setNotes] = useState<Note[]>(sampleNotes);
+  const [fontsLoaded] = useCustomFonts();
+
   if (!fontsLoaded) {
-    return null; // or a loading indicator
+    return <ActivityIndicator size="large" style={styles.loader} />;
   }
 
-  const renderItem: ListRenderItem<Todo> = ({ item }) => {
-    return (
-      <View style={[styles.taskItem, item.completed && styles.taskItemDone]}>
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text
-              style={[styles.taskText, item.completed && styles.taskTextDone]}
-            >
-              {item.title}
-            </Text>
-            <Text style={{ fontSize: 12, color: "#777" }}>
-              {item.date} - {item.time}
-            </Text>
-          </View>
-          <TouchableOpacity onPress={() => toggleTask(item.id)}>
-            <View className="flex-row items-center gap-2">
-              <Ionicons
-                name={item.completed ? "checkmark-circle" : "ellipse-outline"}
-                size={24}
-                color={item.completed ? "#00C897" : "#ccc"}
-              />
-            </View>
+  // Render each cell based on status
+  const renderGrid = (note: Note) => (
+    <FlatList
+      data={note.grid}
+      keyExtractor={(_, idx) => String(idx)}
+      numColumns={COLS}
+      scrollEnabled={false}
+      renderItem={({ item, index }) => {
+        // Sequence of non-null statuses up to this index
+        const bgColor =
+          item === "normal"
+            ? "#2ecc71"
+            : item === "warning"
+            ? "#f1c40f"
+            : item === "alert"
+            ? "#e74c3c"
+            : "transparent";
+        return (
+          <TouchableOpacity style={[styles.cell]} activeOpacity={0.7}>
+            {item && (
+              <View
+                style={[
+                  styles.innerCell,
+                  {
+                    width: CELL_SIZE * 0.8,
+                    height: CELL_SIZE * 0.8,
+                  },
+                ]}
+              >
+                <Text
+                  style={{ color: bgColor, fontSize: 22, fontWeight: "500" }}
+                >
+                  +
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
-        </View>
+        );
+      }}
+      style={{ width: CELL_SIZE * COLS }}
+    />
+  );
+
+  const renderNote = ({ item }: { item: Note }) => (
+    <View style={styles.noteCard}>
+      <View style={styles.headerRow}>
+        <Text style={styles.noteTitle}>{item.title}</Text>
       </View>
-    );
-  };
+      {renderGrid(item)}
+    </View>
+  );
+
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <View className="flex-row items-center justify-between px-2 mb-2 relative">
-        {/* Left: Location */}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.topBar}>
         <WeatherCard />
-        {/* Right: Notification */}
         <NotificationBell />
       </View>
 
       <ImageBackground
         source={require("../../assets/images/tip_background.png")}
         resizeMode="cover"
-        className="flex-row items-center justify-center m-2 p-4 gap-2 overflow-hidden rounded-lg h-36"
+        style={styles.banner}
       >
         <Avatar.Image
           size={54}
-          style={{ marginRight: 6, marginBottom: 4 }}
           source={require("../../assets/images/chat_logo.png")}
         />
-        <View className="flex-1 flex-col justify-between gap-2">
-          <Text
-            style={{
-              fontSize: 22,
-              fontFamily: "PoetsenOne-Regular",
-              color: "white",
-            }}
-          >
-            AI irrigation tips for you
+        <View style={styles.bannerText}>
+          <Text style={styles.bannerTitle}>AI irrigation tips for you</Text>
+          <Text style={styles.bannerSubtitle}>
+            Water your plants every 2 days
           </Text>
-          <Text className="color-stone-50">Water your plants every 2 days</Text>
         </View>
       </ImageBackground>
-      {/*To do list*/}
-      <View className="flex-row items-center justify-between px-4 py-2">
-        <View className="flex-row items-center gap-2">
-          <Image
-            source={require("../../assets/images/checklist.png")}
-            style={{ width: 28, height: 28 }}
-          />
-          <Text style={{ fontFamily: "PoetsenOne-Regular", fontSize: 22 }}>
-            To do list :
-          </Text>
-        </View>
-        <Text className="text-sm text-gray-500">(1/4 completed)</Text>
-      </View>
+
       <FlatList
-        data={tasks}
-        renderItem={renderItem}
-        contentContainerStyle={{
-          paddingHorizontal: 8,
-          paddingVertical: 10,
-        }}
-        style={{
-          marginBottom: 5,
-          maxHeight: 280,
-          borderColor: "#ccc",
-          borderWidth: 1,
-          borderRadius: 10,
-          marginHorizontal: 8,
-        }}
-        scrollEnabled={true}
+        data={notes}
+        keyExtractor={(n) => n.id}
+        renderItem={renderNote}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+        style={{ height: 200 }}
       />
-      <View className="px-2">
-        <View className="flex-row items-center gap-1 p-2">
-          <Image
-            source={require("../../assets/images/plant.png")}
-            style={{ width: 28, height: 28 }}
-          />
-          <Text
-            style={{
-              fontFamily: "PoetsenOne-Regular",
-              fontSize: 22,
-            }}
-          >
-            Garden Health Summary :
-          </Text>
-        </View>
-        <View
-          style={{
-            borderWidth: 0.5,
-            borderColor: "#ccc",
-            padding: 8,
-            margin: 4,
-            borderRadius: 10,
-          }}
-        >
-          <TouchableOpacity style={styles.summaryItem}>
-            <View style={styles.summaryItemContext}>
-              <Avatar.Image
-                size={28}
-                source={require("../../assets/images/wheat-2.png")}
-                style={styles.sumaryItemIcon}
-              />
-              <Text style={styles.summaryItemText}>5 healthy plants</Text>
-            </View>
-            <MaterialIcons name="arrow-forward-ios" size={22} color="black" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.summaryItem}>
-            <View style={styles.summaryItemContext}>
-              <Avatar.Image
-                size={28}
-                source={require("../../assets/images/warning.png")}
-                style={styles.sumaryItemIcon}
-              />
-              <Text style={styles.summaryItemText}>
-                2 plants need attention
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-forward-ios" size={22} color="black" />
-          </TouchableOpacity>
-          <View style={styles.summaryItem}>
-            <View style={styles.summaryItemContext}>
-              <Avatar.Image
-                size={28}
-                source={require("../../assets/images/check.png")}
-                style={styles.sumaryItemIcon}
-              />
-              <Text style={styles.summaryItemText}>
-                43 tasks completed this week
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
+      <TodoList />
     </SafeAreaView>
   );
 };
@@ -192,52 +175,64 @@ const HomeScreen = () => {
 export default HomeScreen;
 
 const styles = StyleSheet.create({
-  summaryItemContext: { flexDirection: "row", alignItems: "center", gap: "10" },
-  summaryItemText: { fontSize: 16, color: "#333", fontWeight: "500" },
-  sumaryItemIcon: { backgroundColor: "#fff" },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontFamily: "PoetsenOne-Regular",
-  },
-  taskItem: {
-    padding: 12,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  taskItemDone: {
-    backgroundColor: "#e1f8e7",
-    opacity: 0.6,
-  },
-  summaryItem: {
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "500",
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-    paddingBottom: 8,
-    marginBottom: 8,
+  container: { flex: 1, backgroundColor: "white" },
+  loader: { flex: 1, justifyContent: "center", alignItems: "center" },
+  topBar: { flexDirection: "row", justifyContent: "space-between", padding: 8 },
+  banner: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    width: "100%",
+    margin: 8,
+    padding: 12,
+    borderRadius: 8,
+    overflow: "hidden",
+    height: 100,
   },
-  taskText: {
-    fontSize: 16,
+  bannerText: { marginLeft: 8, flex: 1 },
+  bannerTitle: {
+    fontSize: 22,
+    fontFamily: "PoetsenOne-Regular",
+    color: "white",
+  },
+  bannerSubtitle: { color: "rgba(255,255,255,0.9)" },
+  listContent: {
+    paddingHorizontal: 16,
+    height: 275,
+    alignItems: "center",
+  },
+  noteCard: {
+    marginRight: 16,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    elevation: 2,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    width: 210,
+  },
+  headerRow: { marginBottom: 8 },
+  noteTitle: { fontSize: 16, fontWeight: "600" },
+  noteMeta: { fontSize: 12, color: "#666" },
+  cell: {
+    width: CELL_SIZE,
+    height: CELL_SIZE,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  innerCell: {
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+  },
+  iconText: { fontSize: 24 },
+  seqText: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    fontSize: 10,
+    fontWeight: "bold",
     color: "#333",
-    fontWeight: "500",
-  },
-  taskTextDone: {
-    textDecorationLine: "line-through",
-    color: "#777",
   },
 });

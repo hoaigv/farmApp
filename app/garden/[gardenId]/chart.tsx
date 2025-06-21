@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Dimensions, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { BarChart, LineChart, PieChart } from "react-native-chart-kit";
 import { SceneMap, TabBar, TabView } from "react-native-tab-view";
-import Header from "../../../../components/Header"; // Adjust the import path as necessary
+import Header from "../../../components/Header"; // Adjust the import path as necessary
 const screenWidth = Dimensions.get("window").width;
 const CarePieChart = () => {
   const data = [

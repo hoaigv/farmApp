@@ -72,23 +72,10 @@ export default function RootLayout() {
               />
 
               <Stack.Screen name="garden" options={{ headerShown: false }} />
-
-              {/* <Stack.Screen
-                name="plants/[plantId]"
-                options={{ headerShown: false }}
-              />
               <Stack.Screen
-                name="plants/create"
-                options={{ headerShown: false }}
+                name="inventory"
+                options={{ title: "inventory", headerShown: false }}
               />
-              <Stack.Screen
-                name="plants/[plantId]/reminder"
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="plants/[plantId]/chart"
-                options={{ headerShown: false }}
-              /> */}
               <Stack.Screen
                 name="authentication/login"
                 options={{ headerShown: false }}

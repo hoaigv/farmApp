@@ -1,8 +1,7 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
+import { StyleSheet, Text, TouchableOpacity, View, Image } from "react-native";
+import { images } from "@/data/image"; // Adjust the import path as necessary
 type HeaderProps = {
   title: string;
   showBack?: boolean;
@@ -25,7 +24,7 @@ export default function Header({
           onPress={onBack ? onBack : () => router.back()}
           style={styles.backIcon}
         >
-          <Ionicons name="arrow-back-outline" size={26} color="black" />
+          <Image source={images.close} style={{ width: 30, height: 30 }} />
         </TouchableOpacity>
       )}
       <Text style={styles.title}>{title}</Text>
@@ -45,7 +44,7 @@ const styles = StyleSheet.create({
   },
   backIcon: {
     position: "absolute",
-    left: 12,
+    left: 10,
     padding: 4,
   },
   title: {
