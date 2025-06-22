@@ -18,10 +18,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import { useAppSelector } from "@/store/hooks";
-import FloatingButton from "@/components/FloatingButton";
 import { uploadFile } from "@/api/fileImageApi";
 import { createPlantInventory } from "@/api/plantIventoryApi";
-
+import { crops } from "@/data/image"; // Assuming you have a crops object with icons
+import { showError, showSuccess } from "@/utils/flashMessageService";
 // Validation schema
 const InventorySchema = Yup.object().shape({
   name: Yup.string().required("Required"),
@@ -30,6 +30,7 @@ const InventorySchema = Yup.object().shape({
   perCellMax: Yup.number().min(1).required("Required"),
   description: Yup.string(),
   imageUrl: Yup.string().url(),
+  icon: Yup.string().required("Please select an icon"),
 });
 
 const typeOptions = [
@@ -63,6 +64,7 @@ const VarietyDetailScreen: React.FC = () => {
     perCellMax: existing?.perCellMax ?? 1,
     description: existing?.description || "",
     imageUrl: existing?.imageUrl || "",
+    icon: existing?.icon || "", // Assuming icon is part of existing data
   };
 
   const userId = useAppSelector((state) => state.auth.user?.id);
@@ -115,20 +117,22 @@ const VarietyDetailScreen: React.FC = () => {
     values: typeof initialValues,
     resetForm: () => void
   ) => {
-    if (!userId) {
-      alert("You must be logged in to perform this action.");
+    if (mode === "read") {
+      alert(
+        "You are in read mode. Please switch to edit mode to save changes."
+      );
       return;
     }
     setSubmitting(true);
     try {
       const payload = {
-        userId,
         name: values.name,
         plantType: values.type.toUpperCase(),
         inventoryQuantity: values.quantity,
         perCellMax: values.perCellMax,
         description: values.description || undefined,
         imageUrl: values.imageUrl || undefined,
+        icon: values.icon,
       };
 
       // if (mode === "edit" && existing) {
@@ -137,13 +141,13 @@ const VarietyDetailScreen: React.FC = () => {
       // } else
       if (mode === "create") {
         await createPlantInventory(payload);
-        alert("Created successfully!");
+        showSuccess("Variety created successfully!");
         resetForm();
       }
       router.back();
     } catch (err) {
       console.error(err);
-      alert((err as Error).message);
+      showError("Failed to save variety. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -219,6 +223,40 @@ const VarietyDetailScreen: React.FC = () => {
                 />
                 {touched.name && errors.name && (
                   <Text style={styles.error}>{String(errors.name)}</Text>
+                )}
+                {/* Icon picker */}
+                <Text style={styles.label}>Icon</Text>
+                {mode !== "read" && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.iconScroll}
+                  >
+                    {Object.entries(crops).map(([key, img]) => (
+                      <TouchableOpacity
+                        key={key}
+                        style={[
+                          styles.iconOption,
+                          values.icon === key && styles.iconSelected,
+                        ]}
+                        onPress={() => setFieldValue("icon", key)}
+                      >
+                        <Image source={img} style={styles.iconImage} />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+                {mode === "read" && values.icon && (
+                  <View className="my-2">
+                    <Image
+                      source={crops[values.icon as keyof typeof crops]}
+                      style={styles.iconImage}
+                    />
+                  </View>
+                )}
+
+                {touched.icon && errors.icon && (
+                  <Text style={styles.error}>{String(errors.icon)}</Text>
                 )}
 
                 {/* Type */}
@@ -376,4 +414,17 @@ const styles = StyleSheet.create({
   radioLabel: { marginLeft: 6, fontSize: 14, color: "#555" },
   error: { color: "red", fontSize: 12, marginBottom: 8 },
   readonly: { backgroundColor: "#f0f0f0" },
+  iconScroll: { marginVertical: 8 },
+  iconOption: {
+    marginRight: 12,
+    padding: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  iconSelected: {
+    borderColor: "#007AFF",
+    backgroundColor: "#E6F0FF",
+  },
+  iconImage: { width: 50, height: 50, resizeMode: "contain" },
 });

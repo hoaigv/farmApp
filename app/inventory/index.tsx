@@ -14,7 +14,16 @@ import {
 import React, { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import { useRouter } from "expo-router";
-import { getMyPlantInventories, PlantInventory } from "@/api/plantIventoryApi";
+import {
+  getMyPlantInventories,
+  PlantInventory,
+  deletePlantInventories,
+} from "@/api/plantIventoryApi";
+import {
+  showError,
+  showSuccess,
+  showWarning,
+} from "@/utils/flashMessageService";
 const { width } = Dimensions.get("window");
 
 const BunkerScreen: React.FC = () => {
@@ -27,7 +36,7 @@ const BunkerScreen: React.FC = () => {
   const [grid, setGrid] = useState<Array<PlantInventory | null>>(
     Array(maxCells).fill(null)
   );
-  const [action, setAction] = useState<"add" | "remove" | null>(null);
+  const [action, setAction] = useState<"remove" | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -98,11 +107,23 @@ const BunkerScreen: React.FC = () => {
     });
   };
 
-  const handleCellLongPress = (index: number) => {
+  const handleDeletePress = async (id: string) => {
+    if (!id) return;
+
     /* your existing long-press logic… */
+
+    try {
+      const msg = await deletePlantInventories([id]);
+      showSuccess(msg);
+      setGrid((prev) =>
+        prev.map((cell) => (cell && cell.id === id ? null : cell))
+      );
+    } catch (err) {
+      showError("Failed to delete inventory item.");
+    }
   };
 
-  const toggleAction = (key: "add" | "remove") => {
+  const toggleAction = (key: "remove") => {
     setAction((prev) => (prev === key ? null : key));
   };
 
@@ -152,7 +173,12 @@ const BunkerScreen: React.FC = () => {
               {icon && (
                 <>
                   <TouchableOpacity
-                    onPress={() => handleDetailInvenPress(icon)}
+                    onPress={() => {
+                      if (action !== "remove") handleDetailInvenPress(icon);
+                      else {
+                        handleDeletePress(icon.id);
+                      }
+                    }}
                     style={styles.iconWrapper}
                   >
                     <Image
