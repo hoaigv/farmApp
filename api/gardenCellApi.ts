@@ -9,7 +9,7 @@ export interface GardenCell {
   quantity: number;
   healthStatus: "NORMAL" | "DISEASED" | "DEAD"; // hoặc các trạng thái khác backend trả về
   plantInventoryId: string;
-  plantImageUrl: string;
+  icon: string;
 }
 
 // Kết quả trả về trong trường `result`

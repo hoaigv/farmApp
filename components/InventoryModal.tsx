@@ -11,7 +11,7 @@ import {
   List,
 } from "react-native-paper";
 import { getMyPlantInventories, PlantInventory } from "@/api/plantIventoryApi";
-
+import { crops } from "@/data/image";
 type Props = {
   visible: boolean;
   onDismiss: () => void;
@@ -90,7 +90,7 @@ const InventoryModal = ({ visible, onDismiss, onConfirm }: Props) => {
                 description={`Left: ${item.inventoryQuantity} — Max/cell: ${item.perCellMax}`}
                 left={() => (
                   <Image
-                    source={{ uri: item.imageUrl }}
+                    source={crops[item.icon as keyof typeof crops]} // Replace with actual image source
                     style={styles.avatar}
                   />
                 )}

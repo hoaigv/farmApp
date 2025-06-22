@@ -31,6 +31,7 @@ import {
   showWarning,
 } from "@/utils/flashMessageService";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { crops } from "../../../data/image";
 const { width } = Dimensions.get("window");
 type HealthCellStatus = "NORMAL" | "DISEASED" | "DEAD";
 const CreateGardenLayout = () => {
@@ -61,6 +62,7 @@ const CreateGardenLayout = () => {
   const [currentAddPlant, setCurrentAddPlant] = useState<GardenCell | null>(
     null
   ); // temp data for placement
+  const [icons, setIcons] = useState<string>(); // icons for each cell
 
   /**
    * Toggles between "add" and "remove" modes.
@@ -95,8 +97,9 @@ const CreateGardenLayout = () => {
       quantity: qty,
       healthStatus: "NORMAL",
       plantInventoryId: inv.id,
-      plantImageUrl: inv.imageUrl || "",
+      icon: inv.icon || "",
     });
+    setIcons(inv.icon);
   };
 
   const handleSelectPress = (id: string) => {
@@ -314,7 +317,10 @@ const CreateGardenLayout = () => {
             >
               {currentAddPlant ? (
                 <>
-                  <Text style={{ fontSize: 22 }}>🌳</Text>
+                  <Image
+                    source={crops[icons as keyof typeof crops]} // Replace with actual image source
+                    className="w-6 h-6"
+                  />
                   <Text style={{ fontSize: 12 }}>
                     X {currentAddPlant.quantity}
                   </Text>
@@ -496,21 +502,55 @@ const CreateGardenLayout = () => {
                         justifyContent: "center",
                         backgroundColor: "white",
                         borderRadius: 10,
-                        borderWidth: 4,
+                        borderWidth: 5,
                       },
                       selectedIds.length > 0 && selectedIds.includes(item.id)
                         ? { borderColor: "#1E90FF" }
                         : statusStyle,
                     ]}
                   >
+                    {item.healthStatus === "DEAD" && (
+                      <Image
+                        source={crops.stump} // Replace with actual image source
+                        style={{
+                          width: cellSize * 0.25, // 80% of cellSize
+                          height: cellSize * 0.25, // 80% of cellSize
+                          position: "absolute",
+                          top: cellSize * 0.05, // 10% padding from top
+                          left: cellSize * 0.05, // 10% padding from left
+                        }}
+                      />
+                    )}
+                    {item.healthStatus === "DISEASED" && (
+                      <Image
+                        source={crops.pest} // Replace with actual image source
+                        style={{
+                          width: cellSize * 0.25, // 80% of cellSize
+                          height: cellSize * 0.25, // 80% of cellSize
+                          position: "absolute",
+                          top: cellSize * 0.05, // 10% padding from top
+                          left: cellSize * 0.05, // 10% padding from left
+                        }}
+                      />
+                    )}
                     {/* cây to nhỏ theo cellSize */}
-                    <Text
-                      style={{
-                        fontSize: cellSize * 0.45 /* 50% of cellSize */,
-                      }}
-                    >
-                      🌳
-                    </Text>
+                    {item.icon ? (
+                      <Image
+                        source={crops[item.icon as keyof typeof crops]} // Replace with actual image source
+                        style={{
+                          width: cellSize * 0.45, // 80% of cellSize
+                          height: cellSize * 0.45, // 80% of cellSize
+                        }}
+                      />
+                    ) : (
+                      <Text
+                        style={{
+                          fontSize: cellSize * 0.45 /* 50% of cellSize */,
+                        }}
+                      >
+                        🌳
+                      </Text>
+                    )}
 
                     {/* số lượng cũng scale và đặt vị trí dynamic */}
                     <Text
