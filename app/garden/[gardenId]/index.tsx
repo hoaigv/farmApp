@@ -372,7 +372,7 @@ const CreateGardenLayout = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionItem}
-              onPress={() => router.push("/garden/123/note")}
+              onPress={() => router.push(`/garden/${gardenId}/note`)}
             >
               <Image source={images.pencil} style={{ width: 24, height: 24 }} />
               <Text style={styles.actionText}>Note</Text>
