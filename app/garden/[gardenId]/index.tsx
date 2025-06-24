@@ -361,7 +361,7 @@ const CreateGardenLayout = () => {
 
             {/* Other Tools (static) */}
             <TouchableOpacity
-              onPress={() => router.push("/garden/123/reminder")}
+              onPress={() => router.push(`/garden/${gardenId}/reminder`)}
               style={styles.actionItem}
             >
               <Image
