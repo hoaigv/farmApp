@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { ReactNode } from "react";
+import React, { ReactNode, useState, useEffect, useCallback } from "react";
 import {
   FlatList,
   SafeAreaView,
@@ -8,136 +8,168 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Platform,
+  RefreshControl,
 } from "react-native";
 import useCustomFonts from "../../hook/FontLoader";
-type FeatureCardProps = {
+import { getMyChatSessions, ChatbotSession } from "../../api/sessionApi";
+
+// Reusable FeatureCard component
+const FeatureCard: React.FC<{
   icon: ReactNode;
   title: string;
   description: string;
   bgColor: string;
-  titleColor?: string;
-  descriptionColor?: string;
-};
-const FeatureCard: React.FC<FeatureCardProps> = ({
-  icon,
-  title,
-  description,
-  bgColor,
-  titleColor,
-  descriptionColor,
-}) => (
+}> = ({ icon, title, description, bgColor }) => (
   <TouchableOpacity style={[styles.card, { backgroundColor: bgColor }]}>
     <View style={styles.iconContainer}>{icon}</View>
-
-    <Text style={[styles.title, { color: titleColor || "#1B1B1B" }]}>
-      {title}
-    </Text>
-    <Text
-      style={[styles.description, { color: descriptionColor || "#4A4A4A" }]}
-    >
-      {description}
-    </Text>
+    <Text style={styles.cardTitle}>{title}</Text>
+    <Text style={styles.cardDesc}>{description}</Text>
   </TouchableOpacity>
 );
-const ChatItem = ({ title }: { title: string }) => (
-  <View style={styles.chatItem}>
+
+const ChatItem = ({
+  session,
+  onPress,
+}: {
+  session: ChatbotSession;
+  onPress: () => void;
+}) => (
+  <TouchableOpacity style={styles.chatItem} onPress={onPress}>
     <Ionicons
       name="chatbubble-outline"
       size={20}
       color="#555"
       style={{ marginRight: 10 }}
     />
-    <Text style={styles.chatText}>{title}</Text>
-  </View>
+    <Text style={styles.chatText}>{session.chatTitle}</Text>
+  </TouchableOpacity>
 );
-const recentChats = [
-  { id: "1", title: "How to Improve Soil Quality for Vegetables" },
-  { id: "2", title: "Pest Control Methods for Organic Farming" },
-  { id: "3", title: "How to Identify Fungal Infections in Plants" },
-  { id: "4", title: "Weather Forecast for Rice Farming This Week" },
-];
 
 const ChatScreen = () => {
   const router = useRouter();
   const [fontsLoaded] = useCustomFonts();
-  if (!fontsLoaded) {
-    return null; // or a loading indicator
-  }
+  const [sessions, setSessions] = useState<ChatbotSession[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadSessions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getMyChatSessions();
+      setSessions(res.result);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadSessions();
+    setRefreshing(false);
+  }, [loadSessions]);
+
+  if (!fontsLoaded) return null;
+
+  const goNewChat = () => {
+    router.push("/chat/new");
+  };
+
+  const goHistory = () => router.push("/chat/history");
+  const openChat = (id: string, title: string) =>
+    router.push({ pathname: `/chat/${id}`, params: { chatTitle: title } });
+
+  const sortedByDate = [...sessions].sort(
+    (a, b) => new Date(b.createAt).getTime() - new Date(a.createAt).getTime()
+  );
+  // Only show the 3 most recent sessions
+  const recent = sortedByDate.slice(0, 3);
+
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <View className="items-center px-2  pb-4">
-        <Text style={styles.header_lable}>Chat With AI</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerLabel}>Garden AI Assistant</Text>
       </View>
 
-      <View className="mx-4 mb-3">
-        <TouchableOpacity
-          className="flex-row items-center justify-between rounded-xl bg-primary px-4 py-3 shadow-md"
-          style={styles.shadowBox}
-          onPress={() => router.push(`/chat/123`)}
-        >
-          <Text className="text-lg font-semibold text-white">New Chat</Text>
-          <Ionicons name="add-circle-outline" size={24} color="white" />
+      <View style={styles.newChatWrapper}>
+        <TouchableOpacity style={styles.newChatBtn} onPress={goNewChat}>
+          <Text style={styles.newChatText}>Start New Chat</Text>
+          <Ionicons name="add-circle-outline" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      <View className="mx-4 mb-2 mt-1 flex-row items-center justify-between">
-        <Text className="text-xl font-semibold text-black">Chat history</Text>
-        <TouchableOpacity
-          style={styles.shadowBox}
-          onPress={() => router.push(`/chat/history`)}
-        >
-          <Text className="text-sm text-gray-500">See all</Text>
-        </TouchableOpacity>
-      </View>
-      {/* Chat list */}
-      <FlatList
-        data={recentChats}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ChatItem title={item.title} />}
-        contentContainerStyle={{ padding: 10 }}
-        ListFooterComponent={
-          <View style={styles.container}>
-            <FeatureCard
-              icon={<Ionicons name="leaf-outline" size={24} color="#2E7D32" />}
-              title="Crop Consulting"
-              description="Tips for planting and taking care of crops"
-              bgColor="#E0F8EC"
-              titleColor="#1B1B1B"
-              descriptionColor="#4A4A4A"
+      {loading && !refreshing ? (
+        <ActivityIndicator style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          data={recent}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ChatItem
+              session={item}
+              onPress={() => openChat(item.id, item.chatTitle)}
             />
-            <FeatureCard
-              icon={
-                <MaterialCommunityIcons
-                  name="image-search-outline"
-                  size={24}
-                  color="#D84315"
+          )}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListFooterComponent={() => (
+            <>
+              <TouchableOpacity onPress={goHistory} style={styles.seeAllBtn}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+
+              {/* Inline features grid inside FlatList footer to avoid extra spacing */}
+              <View style={styles.featuresContainer}>
+                <FeatureCard
+                  icon={
+                    <Ionicons name="leaf-outline" size={24} color="#2E7D32" />
+                  }
+                  title="Soil Analysis"
+                  description="Get recommendations to enrich soil health"
+                  bgColor="#E0F8EC"
                 />
-              }
-              title="Disease Diagnosis"
-              description="Send an image to get a result"
-              bgColor="#FFF0E5"
-              titleColor="#1B1B1B"
-              descriptionColor="#4A4A4A"
-            />
-            <FeatureCard
-              icon={<Ionicons name="cloud-outline" size={24} color="#1565C0" />}
-              title="Weather Forecast"
-              description="Check today’s agricultural weather"
-              bgColor="#EAF3FB"
-              titleColor="#1B1B1B"
-              descriptionColor="#4A4A4A"
-            />
-            <FeatureCard
-              icon={<Ionicons name="bulb-outline" size={24} color="#558B2F" />}
-              title="Farming Tips"
-              description="Suggestions based on season and crop"
-              bgColor="#F1F8E9"
-              titleColor="#1B1B1B"
-              descriptionColor="#4A4A4A"
-            />
-          </View>
-        }
-      />
+                <FeatureCard
+                  icon={
+                    <MaterialCommunityIcons
+                      name="bug-check-outline"
+                      size={24}
+                      color="#D84315"
+                    />
+                  }
+                  title="Pest Diagnosis"
+                  description="Identify and treat pests organically"
+                  bgColor="#FFF0E5"
+                />
+                <FeatureCard
+                  icon={
+                    <Ionicons name="cloud-outline" size={24} color="#1565C0" />
+                  }
+                  title="Weather Forecast"
+                  description="Plan farm activities with detailed weather"
+                  bgColor="#EAF3FB"
+                />
+                <FeatureCard
+                  icon={
+                    <Ionicons name="bulb-outline" size={24} color="#558B2F" />
+                  }
+                  title="Planting Tips"
+                  description="Seasonal advice for crop success"
+                  bgColor="#F1F8E9"
+                />
+              </View>
+            </>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -145,11 +177,34 @@ const ChatScreen = () => {
 export default ChatScreen;
 
 const styles = StyleSheet.create({
-  header_lable: {
-    fontSize: 22,
-    fontFamily: "PoetsenOne-Regular",
+  container: { flex: 1, backgroundColor: "#fff" },
+  header: { alignItems: "center", paddingVertical: 16 },
+  headerLabel: { fontSize: 22, fontFamily: "PoetsenOne-Regular" },
+  newChatWrapper: { marginHorizontal: 16, marginBottom: 12 },
+  newChatBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#00C897",
+    padding: 12,
+    borderRadius: 12,
+    ...Platform.select({
+      android: { elevation: 4 },
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+      },
+    }),
   },
-  container: {
+  newChatText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  listContent: { paddingHorizontal: 16, paddingBottom: 16 },
+  chatItem: { flexDirection: "row", alignItems: "center", paddingVertical: 10 },
+  chatText: { fontSize: 15, color: "#333" },
+  seeAllBtn: { paddingVertical: 10, alignItems: "center" },
+  seeAllText: { fontSize: 14, color: "#007AFF" },
+  featuresContainer: {
     flexWrap: "wrap",
     flexDirection: "row",
     justifyContent: "space-between",
@@ -169,30 +224,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignSelf: "flex-start",
   },
-  title: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  description: {
-    color: "white",
-    fontSize: 12,
-  },
-  chatItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-  },
-  chatText: {
-    fontSize: 15,
-    color: "#333",
-  },
-  shadowBox: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+  cardTitle: { fontSize: 16, fontWeight: "600", color: "#1B1B1B" },
+  cardDesc: { fontSize: 12, color: "#4A4A4A" },
 });

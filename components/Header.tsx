@@ -54,5 +54,6 @@ const styles = StyleSheet.create({
   rightElement: {
     position: "absolute",
     right: 12,
+    bottom: 2,
   },
 });
