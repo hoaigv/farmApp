@@ -27,7 +27,9 @@ export default function Header({
           <Image source={images.close} style={{ width: 30, height: 30 }} />
         </TouchableOpacity>
       )}
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title}>
+        {title.length > 20 ? title.slice(0, 20) + "..." : title}
+      </Text>
       <View style={styles.rightElement}>{rightElement}</View>
     </View>
   );

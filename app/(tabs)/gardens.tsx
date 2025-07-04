@@ -106,7 +106,7 @@ const GardenListScreen = () => {
     const conditionColor =
       item.gardenCondition === "NORMAL"
         ? "#2ecc71" // green
-        : item.gardenCondition === "WARNING"
+        : item.gardenCondition === "DISEASED"
         ? "#f1c40f" // yellow
         : item.gardenCondition === "ALERT"
         ? "#e74c3c" // red

@@ -53,18 +53,7 @@ export default function RootLayout() {
             <AuthRedirectWrapper>
               <Stack>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="forum/[id]"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="forum/create"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="forum/history"
-                  options={{ headerShown: false }}
-                />
+                <Stack.Screen name="forum" options={{ headerShown: false }} />
                 <Stack.Screen
                   name="chat/[roomId]"
                   options={{ headerShown: false }}

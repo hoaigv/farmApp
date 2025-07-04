@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   FlatList,
   ImageBackground,
   SafeAreaView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   ActivityIndicator,
 } from "react-native";
@@ -16,123 +15,125 @@ import WeatherCard from "../../components/WeatherCard";
 import useCustomFonts from "../../hook/FontLoader";
 
 import TodoList from "../../components/TodoList";
-const ROWS = 6;
-const COLS = 6;
-const CELL_SIZE = (200 / COLS) * 0.97;
+import { fetchGardens, ListGardensResponse } from "../../api/gardenApi";
+import { fetchGardenCells, GardenCell } from "@/api/gardenCellApi";
 
-type CellValue = string | null;
+const ROWS_DEFAULT = 6;
+const COLS_DEFAULT = 6;
+const CELL_SIZE = (200 / COLS_DEFAULT) * 0.97;
+
 type Status = "normal" | "warning" | "alert";
-type Note = {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  completed: boolean;
-  grid: CellValue[];
-};
-function generateGrid(total: number, filledCount: number): CellValue[] {
-  const arr: CellValue[] = Array(total).fill(null);
-  const indices = Array.from({ length: total }, (_, i) => i);
-  // shuffle chỉ số
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
-  }
-  const chosen = indices.slice(0, filledCount);
-  const options: Status[] = ["normal", "warning", "alert"];
-  chosen.forEach((idx) => {
-    arr[idx] = options[Math.floor(Math.random() * options.length)];
-  });
-  return arr;
-}
+type CellValue = Status | null;
 
-// Sample grid statuses: green=normal, yellow=warning, red=alert
-const sampleNotes: Note[] = [
-  {
-    id: "1",
-    title: "Water Plants",
-    date: "2025-06-15",
-    time: "08:00",
-    completed: false,
-    grid: generateGrid(ROWS * COLS, 28),
-  },
-  {
-    id: "2",
-    title: "Fertilize",
-    date: "2025-06-15",
-    time: "10:00",
-    completed: true,
-    grid: generateGrid(ROWS * COLS, 28),
-  },
-  {
-    id: "3",
-    title: "Fertilize",
-    date: "2025-06-15",
-    time: "10:00",
-    completed: false,
-    grid: generateGrid(ROWS * COLS, 25),
-  },
-];
+type GardenWithGrid = {
+  id: string;
+  name: string;
+  grid: CellValue[];
+  rowLength: number;
+  colLength: number;
+};
 
 const HomeScreen = () => {
-  const [notes, setNotes] = useState<Note[]>(sampleNotes);
+  const [gardens, setGardens] = useState<GardenWithGrid[]>([]);
+  const [loading, setLoading] = useState(true);
   const [fontsLoaded] = useCustomFonts();
 
-  if (!fontsLoaded) {
+  // Fetch garden data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const listResp: ListGardensResponse = await fetchGardens({});
+        const gardensData = await Promise.all(
+          listResp.result.map(async (g) => {
+            const cellsResp = await fetchGardenCells({ gardenId: g.id });
+            const total = g.rowLength * g.colLength;
+            const grid: CellValue[] = Array(total).fill(null);
+            cellsResp.result.cells.forEach((cell: GardenCell) => {
+              const idx = cell.rowIndex * g.colLength + cell.colIndex;
+              grid[idx] =
+                cell.healthStatus === "NORMAL"
+                  ? "normal"
+                  : cell.healthStatus === "DISEASED"
+                  ? "warning"
+                  : "alert";
+            });
+            return {
+              id: g.id,
+              name: g.name,
+              grid,
+              rowLength: g.rowLength,
+              colLength: g.colLength,
+            };
+          })
+        );
+        setGardens(gardensData);
+      } catch (err) {
+        console.error("Error loading gardens:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Memoized render functions
+  const renderGrid = useCallback(
+    (garden: GardenWithGrid) => (
+      <FlatList
+        data={garden.grid}
+        keyExtractor={(_, idx) => String(idx)}
+        numColumns={garden.colLength}
+        scrollEnabled={false}
+        renderItem={({ item }) => {
+          const bgColor =
+            item === "normal"
+              ? "#2ecc71"
+              : item === "warning"
+              ? "#f1c40f"
+              : item === "alert"
+              ? "#e74c3c"
+              : "transparent";
+          return (
+            <View style={styles.cell}>
+              {item && (
+                <View
+                  style={[
+                    styles.innerCell,
+                    { width: CELL_SIZE * 0.8, height: CELL_SIZE * 0.8 },
+                  ]}
+                >
+                  <Text
+                    style={{ color: bgColor, fontSize: 22, fontWeight: "500" }}
+                  >
+                    +
+                  </Text>
+                </View>
+              )}
+            </View>
+          );
+        }}
+        style={{ width: CELL_SIZE * garden.colLength }}
+      />
+    ),
+    []
+  );
+
+  const renderGarden = useCallback(
+    ({ item }: { item: GardenWithGrid }) => (
+      <View style={styles.noteCard}>
+        <View style={styles.headerRow} className="items-center">
+          <Text style={styles.noteTitle}>{item.name}</Text>
+        </View>
+        <View className="items-center">{renderGrid(item)}</View>
+      </View>
+    ),
+    [renderGrid]
+  );
+
+  // Early return for loading state
+  if (!fontsLoaded || loading) {
     return <ActivityIndicator size="large" style={styles.loader} />;
   }
-
-  // Render each cell based on status
-  const renderGrid = (note: Note) => (
-    <FlatList
-      data={note.grid}
-      keyExtractor={(_, idx) => String(idx)}
-      numColumns={COLS}
-      scrollEnabled={false}
-      renderItem={({ item, index }) => {
-        // Sequence of non-null statuses up to this index
-        const bgColor =
-          item === "normal"
-            ? "#2ecc71"
-            : item === "warning"
-            ? "#f1c40f"
-            : item === "alert"
-            ? "#e74c3c"
-            : "transparent";
-        return (
-          <TouchableOpacity style={[styles.cell]} activeOpacity={0.7}>
-            {item && (
-              <View
-                style={[
-                  styles.innerCell,
-                  {
-                    width: CELL_SIZE * 0.8,
-                    height: CELL_SIZE * 0.8,
-                  },
-                ]}
-              >
-                <Text
-                  style={{ color: bgColor, fontSize: 22, fontWeight: "500" }}
-                >
-                  +
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        );
-      }}
-      style={{ width: CELL_SIZE * COLS }}
-    />
-  );
-
-  const renderNote = ({ item }: { item: Note }) => (
-    <View style={styles.noteCard}>
-      <View style={styles.headerRow}>
-        <Text style={styles.noteTitle}>{item.title}</Text>
-      </View>
-      {renderGrid(item)}
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -158,15 +159,18 @@ const HomeScreen = () => {
         </View>
       </ImageBackground>
 
-      <FlatList
-        data={notes}
-        keyExtractor={(n) => n.id}
-        renderItem={renderNote}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        style={{ height: 200 }}
-      />
+      <View style={{ height: 280 }}>
+        <FlatList
+          data={gardens}
+          keyExtractor={(g) => g.id}
+          renderItem={renderGarden}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+        />
+      </View>
+
+      <Text style={styles.notesLabel}>Notes:</Text>
       <TodoList />
     </SafeAreaView>
   );
@@ -198,6 +202,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 275,
     alignItems: "center",
+    flexGrow: 1,
   },
   noteCard: {
     marginRight: 16,
@@ -211,7 +216,6 @@ const styles = StyleSheet.create({
   },
   headerRow: { marginBottom: 8 },
   noteTitle: { fontSize: 16, fontWeight: "600" },
-  noteMeta: { fontSize: 12, color: "#666" },
   cell: {
     width: CELL_SIZE,
     height: CELL_SIZE,
@@ -226,13 +230,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 8,
   },
-  iconText: { fontSize: 24 },
-  seqText: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "#333",
+  notesLabel: {
+    marginHorizontal: 16,
+    fontSize: 22,
+    fontWeight: "600",
   },
 });
