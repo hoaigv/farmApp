@@ -68,7 +68,6 @@ const CreateGardenLayout = () => {
    * Toggles between "add" and "remove" modes.
    * Opens modal when entering add mode.
    */
-  console.log(selectedIds);
   const toggleAction = (key: "add" | "remove" | "edit") => {
     setSelectedIds([]);
     setAction((prev) => {
@@ -80,6 +79,7 @@ const CreateGardenLayout = () => {
       return key; // chọn mới
     });
     if (key === "add" && currentAddPlant === null) {
+      setGridAdd([]);
       setModalVisible(true);
     }
   };
@@ -127,13 +127,14 @@ const CreateGardenLayout = () => {
       return;
     }
     // Nếu ô đã có cây rồi thì không làm gì cả
-    if (grid?.[index]) {
+    if (grid?.[index] || gridSpaceWork?.[index]) {
+      showWarning("Cell already has a plant!");
       return;
     }
     const rowIndex = Math.floor(index / cols);
     const colIndex = index % cols;
     const updated: GardenCell = { ...currentAddPlant, rowIndex, colIndex };
-
+    console.log("Adding cell at index:", index, "with data:", updated);
     // buffer for API batch upsert
     setGridAdd((prev) => [...prev, updated]);
 
@@ -162,6 +163,11 @@ const CreateGardenLayout = () => {
           cell && selectedIds.includes(cell.id) ? null : cell
         )
       );
+      setgridSpaceWork((prev) =>
+        prev.map((cell) =>
+          cell && selectedIds.includes(cell.id) ? null : cell
+        )
+      );
       setSelectedIds([]);
     } catch (err: any) {
       console.error(err);
@@ -172,6 +178,7 @@ const CreateGardenLayout = () => {
   /**
    * Saves all buffered new cells to backend via batch upsert.
    */
+  console.info("Saving cells:", gridAdd.length);
   const handleSaveCellsPress = async () => {
     const toAdd = gridAdd.filter((c): c is GardenCell => c !== null);
     if (toAdd.length === 0) {
@@ -389,10 +396,7 @@ const CreateGardenLayout = () => {
               />
               <Text style={styles.actionText}>Inventory</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionItem]}>
-              <Image source={images.scan} style={{ width: 24, height: 24 }} />
-              <Text style={styles.actionText}>Dinostic</Text>
-            </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.actionItem]}
               onPress={() => router.push("/garden/123/chart")}
@@ -402,16 +406,7 @@ const CreateGardenLayout = () => {
             </TouchableOpacity>
           </View>
         </View>
-        <View className="px-2 py-3 flex-row items-center justify-between">
-          <Text
-            style={{
-              fontSize: 18,
-              fontFamily: "PoetsenOne-Regular",
-              color: "#fff",
-            }}
-          >
-            Date : 125
-          </Text>
+        <View className="px-2 pt-3 flex-row items-center justify-between">
           {action === "add" && (
             <TouchableOpacity
               onPress={() => handleSaveCellsPress()}
@@ -441,6 +436,36 @@ const CreateGardenLayout = () => {
             setModalVisible(false);
           }}
         />
+        {action === "edit" && (
+          <View className=" flex-row items-center justify-around w-full ">
+            {/* NORMAL */}
+            <TouchableOpacity
+              onPress={() => handleUpdateHealthStatusPress("NORMAL")}
+              className="flex-row items-center px-4 py-2 bg-green-500 rounded-2xl shadow"
+            >
+              <FontAwesome5 name="check-circle" size={20} color="white" />
+              <Text className="ml-2 text-white font-medium">NORMAL</Text>
+            </TouchableOpacity>
+
+            {/* DISEASED */}
+            <TouchableOpacity
+              onPress={() => handleUpdateHealthStatusPress("DISEASED")}
+              className="flex-row items-center px-4 py-2 bg-yellow-500 rounded-2xl shadow"
+            >
+              <FontAwesome5 name="bug" size={20} color="white" />
+              <Text className="ml-2 text-white font-medium">DISEASED</Text>
+            </TouchableOpacity>
+
+            {/* DEAD */}
+            <TouchableOpacity
+              onPress={() => handleUpdateHealthStatusPress("DEAD")}
+              className="flex-row items-center px-4 py-2 bg-red-500 rounded-2xl shadow"
+            >
+              <FontAwesome5 name="times-circle" size={20} color="white" />
+              <Text className="ml-2 text-white font-medium">DEAD</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <FlatList
           data={
             selectedIds.length > 0 || action === "add" ? gridSpaceWork : grid
@@ -466,13 +491,14 @@ const CreateGardenLayout = () => {
                   {
                     width: cellSize,
                     height: cellSize,
-                    borderWidth: 2,
+                    borderWidth: 4,
                     margin: 3,
-                    borderColor: "#fff",
+                    borderColor: "#A52A2A",
                     alignItems: "center",
                     justifyContent: "center",
                     padding: 2,
                     borderRadius: 10,
+                    backgroundColor: "#FF7F50",
                   },
                 ]}
                 onPress={() => {
@@ -496,8 +522,8 @@ const CreateGardenLayout = () => {
                   <View
                     style={[
                       {
-                        width: cellSize * 0.97,
-                        height: cellSize * 0.97,
+                        width: cellSize * 0.8,
+                        height: cellSize * 0.8,
                         alignItems: "center",
                         justifyContent: "center",
                         backgroundColor: "white",
@@ -516,8 +542,8 @@ const CreateGardenLayout = () => {
                           width: cellSize * 0.25, // 80% of cellSize
                           height: cellSize * 0.25, // 80% of cellSize
                           position: "absolute",
-                          top: cellSize * 0.05, // 10% padding from top
-                          left: cellSize * 0.05, // 10% padding from left
+                          top: cellSize * 0.025, // 10% padding from top
+                          left: cellSize * 0.025, // 10% padding from left
                         }}
                       />
                     )}
@@ -528,8 +554,8 @@ const CreateGardenLayout = () => {
                           width: cellSize * 0.25, // 80% of cellSize
                           height: cellSize * 0.25, // 80% of cellSize
                           position: "absolute",
-                          top: cellSize * 0.05, // 10% padding from top
-                          left: cellSize * 0.05, // 10% padding from left
+                          top: cellSize * 0.025, // 10% padding from top
+                          left: cellSize * 0.025, // 10% padding from left
                         }}
                       />
                     )}
@@ -538,8 +564,8 @@ const CreateGardenLayout = () => {
                       <Image
                         source={crops[item.icon as keyof typeof crops]} // Replace with actual image source
                         style={{
-                          width: cellSize * 0.45, // 80% of cellSize
-                          height: cellSize * 0.45, // 80% of cellSize
+                          width: cellSize * 0.4, // 80% of cellSize
+                          height: cellSize * 0.4, // 80% of cellSize
                         }}
                       />
                     ) : (
@@ -577,37 +603,6 @@ const CreateGardenLayout = () => {
             marginVertical: 8,
           }}
         />
-
-        {action === "edit" && (
-          <View className="absolute flex-row items-center justify-around w-full bottom-32 space-x-4">
-            {/* NORMAL */}
-            <TouchableOpacity
-              onPress={() => handleUpdateHealthStatusPress("NORMAL")}
-              className="flex-row items-center px-4 py-2 bg-green-500 rounded-2xl shadow"
-            >
-              <FontAwesome5 name="check-circle" size={20} color="white" />
-              <Text className="ml-2 text-white font-medium">NORMAL</Text>
-            </TouchableOpacity>
-
-            {/* DISEASED */}
-            <TouchableOpacity
-              onPress={() => handleUpdateHealthStatusPress("DISEASED")}
-              className="flex-row items-center px-4 py-2 bg-yellow-500 rounded-2xl shadow"
-            >
-              <FontAwesome5 name="bug" size={20} color="white" />
-              <Text className="ml-2 text-white font-medium">DISEASED</Text>
-            </TouchableOpacity>
-
-            {/* DEAD */}
-            <TouchableOpacity
-              onPress={() => handleUpdateHealthStatusPress("DEAD")}
-              className="flex-row items-center px-4 py-2 bg-red-500 rounded-2xl shadow"
-            >
-              <FontAwesome5 name="times-circle" size={20} color="white" />
-              <Text className="ml-2 text-white font-medium">DEAD</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     </SafeAreaView>
   );

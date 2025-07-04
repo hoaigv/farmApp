@@ -20,7 +20,8 @@ export default function GardenDimensionPicker() {
   const [name, setName] = useState("");
   const [rowLength, setrowLength] = useState<number>(1);
   const [colLength, setcolLength] = useState<number>(1);
-  const options = [1, 2, 3, 4, 5, 6];
+  const optionRows = [1, 2, 3, 4, 5, 6];
+  const optionCols = [1, 2, 3, 4];
   const handleCreateGarden = async () => {
     if (!name.trim()) {
       Alert.alert("Validation Error", "Please enter a garden name.");
@@ -67,14 +68,14 @@ export default function GardenDimensionPicker() {
         <View style={styles.pickerRow}>
           {/* Width Picker */}
           <View style={styles.pickerContainer}>
-            <Text style={styles.pickerLabel}>Width</Text>
+            <Text style={styles.pickerLabel}>Rows</Text>
             <Picker
               selectedValue={rowLength}
               onValueChange={setrowLength}
               style={styles.picker}
               itemStyle={styles.itemStyle}
             >
-              {options.map((o) => (
+              {optionRows.map((o) => (
                 <Picker.Item key={o} label={`${o} ft`} value={o} />
               ))}
             </Picker>
@@ -82,14 +83,14 @@ export default function GardenDimensionPicker() {
 
           {/* Length Picker */}
           <View style={styles.pickerContainer}>
-            <Text style={styles.pickerLabel}>Length</Text>
+            <Text style={styles.pickerLabel}>Cols</Text>
             <Picker
               selectedValue={colLength}
               onValueChange={setcolLength}
               style={styles.picker}
               itemStyle={styles.itemStyle}
             >
-              {options.map((o) => (
+              {optionCols.map((o) => (
                 <Picker.Item key={o} label={`${o} ft`} value={o} />
               ))}
             </Picker>

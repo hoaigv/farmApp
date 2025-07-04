@@ -40,12 +40,12 @@ interface ApiSingleResponse<T> {
  * Fetch all reminders for the current user.
  * Backend trả về: { message: string, result: ReminderResponse[] }
  */
-export const getMyReminders = async (): Promise<
-  ApiSingleResponse<ReminderResponse[]>
-> => {
+export const getMyReminders = async (
+  gardenId: string
+): Promise<ApiSingleResponse<ReminderResponse[]>> => {
   const response = await axiosInstance.get<
     ApiSingleResponse<ReminderResponse[]>
-  >("/reminders/me");
+  >(`/reminders/${gardenId}/me`);
   return response.data;
 };
 /**
@@ -71,7 +71,18 @@ export const createReminder = async (
   >("/reminders", data);
   return response.data;
 };
-
+/**
+ * Fetch all reminders for the current user.
+ * Backend trả về: { message: string, result: ReminderResponse[] }
+ */
+export const getMyRemindersAll = async (): Promise<
+  ApiSingleResponse<ReminderResponse[]>
+> => {
+  const response = await axiosInstance.get<
+    ApiSingleResponse<ReminderResponse[]>
+  >("/reminders/me");
+  return response.data;
+};
 /**
  * Update an existing reminder.
  */

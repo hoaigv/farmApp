@@ -1,128 +1,162 @@
-import React, { useState } from "react";
-import { View, Text, FlatList, StyleSheet, Switch } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
+import {
+  getMyRemindersAll,
+  updateReminder,
+  ReminderResponse,
+} from "../api/reminderApi";
 
-export interface Todo {
-  id: string;
-  gardenName: string;
-  taskType: string;
-  time: string;
-  completed: boolean;
-}
+const TodoList: React.FC = () => {
+  const [reminders, setReminders] = useState<ReminderResponse[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-const initialTodos: Todo[] = [
-  {
-    id: "1",
-    gardenName: "Khu vườn rau sạch",
-    taskType: "Tưới nước",
-    time: "08:00 - 08:30",
-    completed: false,
-  },
-  {
-    id: "2",
-    gardenName: "Vườn hoa hồng",
-    taskType: "Cắt tỉa",
-    time: "09:00 - 09:15",
-    completed: false,
-  },
-  {
-    id: "3",
-    gardenName: "Vườn cây ăn trái",
-    taskType: "Bón phân",
-    time: "10:00 - 10:20",
-    completed: true,
-  },
-];
-
-interface TodoListProps {
-  // Có thể nhận thêm props nếu cần
-}
-
-const TodoList: React.FC<TodoListProps> = () => {
-  const [todos, setTodos] = useState<Todo[]>(initialTodos);
-
-  const handleToggleComplete = (id: string) => {
-    setTodos((prev) => {
-      // Tìm item và toggle completed
-      const updated = prev.map((item) =>
-        item.id === id ? { ...item, completed: !item.completed } : item
-      );
-      // Lấy item toggled
-      const toggled = updated.find((item) => item.id === id)!;
-      // Loại bỏ item cũ khỏi mảng
-      const others = updated.filter((item) => item.id !== id);
-      // Nếu đã hoàn thành, đưa về sau cùng, ngược lại đưa về đầu
-      if (toggled.completed) {
-        return [...others, toggled];
-      } else {
-        return [toggled, ...others];
+  useEffect(() => {
+    const fetchReminders = async () => {
+      try {
+        const { result } = await getMyRemindersAll();
+        setReminders(result);
+      } catch (e: any) {
+        console.error("Failed to load reminders", e);
+        setError(e.message || "Error loading reminders");
+      } finally {
+        setLoading(false);
       }
-    });
+    };
+    fetchReminders();
+  }, []);
+
+  /**
+   * Handle completing or skipping a reminder.
+   */
+  const handleAction = async (id: string, action: "complete" | "finalize") => {
+    const rem = reminders.find((r) => r.id === id);
+    if (!rem) return;
+    const newStatus = action === "complete" ? "DONE" : "SKIPPED";
+    try {
+      await updateReminder({
+        ...rem,
+        status: newStatus,
+      });
+      setReminders((prev) => prev.filter((r) => r.id !== id));
+    } catch (e: any) {
+      console.error(`Failed to ${action} reminder`, e);
+      setError(`Unable to ${action} task`);
+    }
   };
 
-  const renderItem = ({ item }: { item: Todo }) => (
+  const renderItem = ({ item }: { item: ReminderResponse }) => (
     <View style={styles.itemContainer}>
-      <View style={styles.info}>
-        <Text style={styles.text}>
-          <Text style={styles.bold}>Khu vườn:</Text> {item.gardenName}
-        </Text>
-        <Text style={styles.text}>
-          <Text style={styles.bold}>Loại công việc:</Text> {item.taskType}
-        </Text>
-        <Text style={styles.text}>
-          <Text style={styles.bold}>Thời gian:</Text> {item.time}
-        </Text>
+      <Text style={styles.text}>
+        <Text style={styles.bold}>Garden:</Text> {item.gardenActivity}
+      </Text>
+      <View style={styles.infoContainer}>
+        <View style={styles.info}>
+          <Text style={styles.text}>
+            <Text style={styles.bold}>Task:</Text> {item.task}
+          </Text>
+          <Text style={styles.text}>
+            <Text style={styles.bold}>Time:</Text>{" "}
+            {item.specificTime
+              ? new Date(item.specificTime).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "-"}
+          </Text>
+        </View>
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity
+            style={[styles.button, styles.completeButton]}
+            onPress={() => handleAction(item.id, "complete")}
+          >
+            <Text style={styles.buttonText}>Complete</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.finalizeButton]}
+            onPress={() => handleAction(item.id, "finalize")}
+          >
+            <Text style={styles.buttonText}>Finalize</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <Switch
-        value={item.completed}
-        onValueChange={() => handleToggleComplete(item.id)}
-      />
     </View>
   );
 
+  const ListEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>No tasks available</Text>
+    </View>
+  );
+
+  if (loading) {
+    return <ActivityIndicator style={styles.loader} size="large" />;
+  }
+
+  if (error) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>{error}</Text>
+      </View>
+    );
+  }
+
   return (
-    <>
-      <Text className="mx-4 my-2 " style={{ fontSize: 18, fontWeight: "500" }}>
-        Note :
-      </Text>
+    <View style={styles.listWrapper}>
       <FlatList
-        data={todos}
+        data={reminders}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
-        className="shadow shadow-slate-300 rounded-lg p-2"
+        contentContainerStyle={
+          reminders.length ? styles.listContainer : styles.emptyListContainer
+        }
+        ListEmptyComponent={ListEmpty}
       />
-    </>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  list: {
-    paddingHorizontal: 16,
+  loader: { flex: 1, justifyContent: "center", alignItems: "center" },
+  listWrapper: { height: 288, margin: 4, flexGrow: 0 },
+  listContainer: { paddingHorizontal: 16 },
+  emptyListContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
   },
   itemContainer: {
-    flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    padding: 8,
     backgroundColor: "#fff",
     borderRadius: 8,
+    padding: 12,
     marginBottom: 12,
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 1 },
     shadowRadius: 3,
     elevation: 2,
+    borderWidth: 0.5,
   },
-  info: {
-    flex: 1,
-  },
-  text: {
-    fontSize: 13,
-    marginBottom: 4,
-  },
-  bold: {
-    fontWeight: "600",
-  },
+  infoContainer: { flexDirection: "row", alignItems: "center" },
+  info: { flex: 1, marginRight: 8 },
+  text: { fontSize: 14, marginBottom: 4 },
+  bold: { fontWeight: "600" },
+  buttonsContainer: { flexDirection: "row", gap: 8 },
+  button: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
+  completeButton: { backgroundColor: "#4CAF50" },
+  finalizeButton: { backgroundColor: "#9C27B0" },
+  buttonText: { color: "#fff", fontSize: 13, fontWeight: "500" },
+  emptyContainer: { justifyContent: "center", alignItems: "center" },
+  emptyText: { fontSize: 16, color: "#888", fontWeight: "400" },
 });
 
 export default TodoList;

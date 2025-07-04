@@ -128,7 +128,7 @@ const ReminderListScreen: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await getMyReminders();
+      const res = await getMyReminders(gardenId as string);
       const remindersUI: Reminder[] = res.result.map((r) => ({
         id: r.id,
         action: r.task,

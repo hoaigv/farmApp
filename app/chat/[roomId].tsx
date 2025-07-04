@@ -63,8 +63,8 @@ const ChatRoomScreen: React.FC = () => {
         const { result }: ChatLogResponse = await getChatLogsBySessionId(
           sessionId
         );
-        const displayMessage = result.reverse();
-        const history: Message[] = displayMessage.flatMap((log) => [
+
+        const history: Message[] = result.flatMap((log) => [
           {
             id: `${log.id}-user`,
             text: log.userMessage,
@@ -78,7 +78,7 @@ const ChatRoomScreen: React.FC = () => {
             timestamp: new Date().toISOString(),
           },
         ]);
-        setMessages(history);
+        setMessages(history); // Reverse to show oldest first
       } catch (error) {
         console.error("Failed to load chat logs:", error);
       } finally {

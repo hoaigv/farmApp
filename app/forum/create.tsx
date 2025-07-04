@@ -1,11 +1,3 @@
-import {
-  AntDesign,
-  Feather,
-  FontAwesome5,
-  MaterialIcons,
-} from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -15,30 +7,41 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  AntDesign,
+  Feather,
+  FontAwesome5,
+  MaterialIcons,
+} from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 
-const CreatePostScreen = () => {
+import { useImageUploader } from "@/hook/useImageUploader";
+import { useCreatePost } from "@/hook/useCreatePost";
+
+export default function CreatePostScreen() {
   const [content, setContent] = useState("");
-  const [image, setImage] = useState<string | null>(null);
   const router = useRouter();
 
-  const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-    });
+  const {
+    imageUrl,
+    uploading,
+    pickAndUpload,
+    clear: clearImage,
+  } = useImageUploader();
+  const { posting, makePost } = useCreatePost();
 
-    if (!result.canceled && result.assets.length > 0) {
-      setImage(result.assets[0].uri);
-    }
-  };
-
-  const handlePost = () => {
+  const onSubmit = async () => {
     if (!content.trim()) return;
-    Alert.alert("Posted", "Your post has been shared!");
-    setContent("");
-    setImage(null);
+    const success = await makePost(content.trim(), imageUrl || undefined);
+    if (success) {
+      setContent("");
+      clearImage();
+      router.back();
+    }
   };
 
   return (
@@ -49,35 +52,23 @@ const CreatePostScreen = () => {
           <AntDesign name="arrowleft" size={24} color="black" />
         </TouchableOpacity>
         <Text className="text-lg font-bold">New Post</Text>
-        <TouchableOpacity onPress={handlePost} disabled={!content.trim()}>
+        <TouchableOpacity
+          onPress={onSubmit}
+          disabled={!content.trim() || posting || uploading}
+        >
           <Text
             className={`text-base font-semibold ${
-              content.trim() ? "text-[#3797EF]" : "text-gray-400"
+              content.trim() && !posting && !uploading
+                ? "text-[#3797EF]"
+                : "text-gray-400"
             }`}
           >
-            Post
+            {posting ? <ActivityIndicator /> : "Post"}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* User Info */}
-      <View className="flex-row items-center mb-3">
-        <Image
-          source={{
-            uri: "https://randomuser.me/api/portraits/men/1.jpg",
-          }}
-          className="w-10 h-10 rounded-full mr-3"
-        />
-        <View>
-          <Text className="font-semibold text-base">Your Profile</Text>
-          <View className="flex-row items-center">
-            <Feather name="globe" size={14} color="#888" />
-            <Text className="text-gray-500 text-xs ml-1">Public</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Caption Input */}
+      {/* Caption Input & Preview */}
       <ScrollView className="flex-1">
         <TextInput
           className="text-lg text-black mb-4"
@@ -89,17 +80,16 @@ const CreatePostScreen = () => {
           style={{ minHeight: 120, lineHeight: 22 }}
         />
 
-        {/* Image Preview */}
-        {image && (
+        {imageUrl && (
           <View className="relative mb-4">
             <Image
-              source={{ uri: image }}
+              source={{ uri: imageUrl }}
               className="w-full h-72 rounded-2xl"
               resizeMode="cover"
             />
             <TouchableOpacity
+              onPress={clearImage}
               className="absolute top-2 right-2 bg-white/80 p-1 rounded-full"
-              onPress={() => setImage(null)}
             >
               <AntDesign name="close" size={18} color="black" />
             </TouchableOpacity>
@@ -107,27 +97,39 @@ const CreatePostScreen = () => {
         )}
       </ScrollView>
 
-      {/* Action Bar (Instagram-like) */}
+      {/* Action Bar */}
       <View className="flex-row justify-around items-center py-3 border-t border-gray-200">
-        <TouchableOpacity onPress={handlePickImage} className="items-center">
+        <TouchableOpacity
+          onPress={pickAndUpload}
+          disabled={uploading || posting}
+          className="items-center"
+        >
           <Feather name="image" size={22} color="#3797EF" />
-          <Text className="text-xs text-gray-600 mt-1">Photo</Text>
+          <Text className="text-xs text-gray-600 mt-1">Photo </Text>
+          {uploading && <ActivityIndicator size="small" />}
         </TouchableOpacity>
-        <TouchableOpacity className="items-center">
+        <TouchableOpacity
+          disabled={uploading || posting}
+          className="items-center"
+        >
           <MaterialIcons name="video-call" size={22} color="#F56040" />
           <Text className="text-xs text-gray-600 mt-1">Video</Text>
         </TouchableOpacity>
-        <TouchableOpacity className="items-center">
+        <TouchableOpacity
+          disabled={uploading || posting}
+          className="items-center"
+        >
           <FontAwesome5 name="hashtag" size={18} color="#A030F5" />
           <Text className="text-xs text-gray-600 mt-1">Tags</Text>
         </TouchableOpacity>
-        <TouchableOpacity className="items-center">
+        <TouchableOpacity
+          disabled={uploading || posting}
+          className="items-center"
+        >
           <Feather name="map-pin" size={20} color="#ED4956" />
           <Text className="text-xs text-gray-600 mt-1">Location</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
-};
-
-export default CreatePostScreen;
+}

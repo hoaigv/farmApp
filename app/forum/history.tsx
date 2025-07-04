@@ -1,6 +1,7 @@
+// src/screens/HistoryScreen.tsx
 import Header from "@/components/Header";
 import { AntDesign, SimpleLineIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FlatList,
   Image,
@@ -8,14 +9,16 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { fetchMyPosts, MyPostsFilters, PostSummary } from "@/api/postApi";
+import { useRouter } from "expo-router";
 
 const FILTERS = [
   { key: "posts", label: "Your Posts" },
   { key: "liked", label: "Liked" },
   { key: "commented", label: "Commented" },
-  { key: "shared", label: "Shared" },
 ];
 
 const SORT_OPTIONS = [
@@ -23,66 +26,60 @@ const SORT_OPTIONS = [
   { key: "oldest", label: "Oldest" },
 ];
 
-type HistoryItem = {
-  id: string;
-  type: "post" | "liked" | "commented" | "shared";
-  title: string;
-  time: string;
-  image: any;
+type HistoryItem = PostSummary & {
+  type: "post" | "liked" | "commented";
 };
 
-const mockHistory: HistoryItem[] = [
-  {
-    id: "1",
-    type: "post",
-    title: "My new tomato harvest",
-    time: "May 24, 2025",
-    image: {
-      uri: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSD4_wSuFLI5i2-_mcVehfdnPdN9kbijPqJ8Q&s",
-    },
-  },
-  {
-    id: "2",
-    type: "liked",
-    title: "Sunflower growth tips",
-    time: "May 23, 2025",
-    image: {
-      uri: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSD4_wSuFLI5i2-_mcVehfdnPdN9kbijPqJ8Q&s",
-    },
-  },
-  {
-    id: "3",
-    type: "commented",
-    title: "Pest control methods",
-    time: "May 22, 2025",
-    image: {
-      uri: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSD4_wSuFLI5i2-_mcVehfdnPdN9kbijPqJ8Q&s",
-    },
-  },
-  {
-    id: "4",
-    type: "shared",
-    title: "Garden layout ideas",
-    time: "May 20, 2025",
-    image: {
-      uri: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSD4_wSuFLI5i2-_mcVehfdnPdN9kbijPqJ8Q&s",
-    },
-  },
-];
-
 const HistoryScreen = () => {
-  const [activeFilter, setActiveFilter] = useState("posts");
-  const [sortOrder, setSortOrder] = useState("newest");
+  const [activeFilter, setActiveFilter] = useState<string>("posts");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [data, setData] = useState<PostSummary[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const router = useRouter();
 
-  const filteredData = mockHistory
-    .filter((item) => item.type === activeFilter)
-    .sort((a, b) => {
-      const dateA = new Date(a.time);
-      const dateB = new Date(b.time);
-      return sortOrder === "newest"
-        ? dateB.getTime() - dateA.getTime()
-        : dateA.getTime() - dateB.getTime();
-    });
+  useEffect(() => {
+    setLoading(true);
+    const loadHistory = async () => {
+      try {
+        // Chuẩn bị filter cho API (không bao gồm sort)
+        const filters: MyPostsFilters = {};
+        if (activeFilter === "liked") {
+          filters.isLike = true;
+        } else if (activeFilter === "commented") {
+          filters.isComment = true;
+        }
+
+        // Gọi API với query params
+        const { result } = await fetchMyPosts(filters);
+
+        // Sort tại client theo createdAt
+        const sortedItems = result.sort((a, b) => {
+          const timeA = new Date(a.createdAt).getTime();
+          const timeB = new Date(b.createdAt).getTime();
+          return sortOrder === "newest" ? timeB - timeA : timeA - timeB;
+        });
+
+        setData(sortedItems);
+      } catch (err) {
+        console.error("Error fetching history:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHistory();
+  }, [activeFilter, sortOrder]);
+
+  // Gán type cho từng item
+  const historyItems: HistoryItem[] = data.map((post) => ({
+    ...post,
+    type:
+      activeFilter === "liked"
+        ? "liked"
+        : activeFilter === "commented"
+        ? "commented"
+        : "post",
+  }));
 
   const renderFilter = ({ label, key }: any) => (
     <TouchableOpacity
@@ -115,16 +112,28 @@ const HistoryScreen = () => {
   );
 
   const renderItem = ({ item }: { item: HistoryItem }) => (
-    <View style={styles.card}>
-      <Image source={item.image} style={styles.thumbnail} />
+    <TouchableOpacity
+      onPress={() => router.push(`/forum/${item.id}`)}
+      style={styles.card}
+    >
+      {item.imageLink && (
+        <Image source={{ uri: item.imageLink }} style={styles.thumbnail} />
+      )}
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle}>{item.title}</Text>
-        <Text style={styles.cardTime}>{item.time}</Text>
+        <Text numberOfLines={2} style={styles.cardBody}>
+          {item.body}
+        </Text>
+        <View style={styles.cardFooter}>
+          <Text style={styles.cardTime}>
+            {new Date(item.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
       </View>
       <TouchableOpacity style={styles.moreBtn}>
         <SimpleLineIcons name="options-vertical" size={20} color="#2E7D32" />
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -132,24 +141,22 @@ const HistoryScreen = () => {
       <Header title="History" />
       <View style={styles.filterContainer}>{FILTERS.map(renderFilter)}</View>
       <View style={styles.sortContainer}>{SORT_OPTIONS.map(renderSort)}</View>
-      <FlatList
-        data={filteredData}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 20 }}
-      />
+      {loading ? (
+        <ActivityIndicator size="large" color="#2E7D32" style={{ flex: 1 }} />
+      ) : (
+        <FlatList
+          data={historyItems}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 20 }}
+        />
+      )}
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F1F8E9", paddingHorizontal: 4 },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#2E7D32",
-    marginBottom: 16,
-  },
   filterContainer: { flexDirection: "row", marginBottom: 12, marginTop: 8 },
   filterBtn: {
     paddingVertical: 6,
@@ -181,9 +188,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   thumbnail: { width: 80, height: 80 },
-  cardContent: { flex: 1, padding: 8, justifyContent: "center" },
+  cardContent: { flex: 1, padding: 8, justifyContent: "space-between" },
   cardTitle: { fontSize: 16, fontWeight: "600", color: "#2E7D32" },
-  cardTime: { fontSize: 12, color: "#757575", marginTop: 4 },
+  cardBody: { fontSize: 14, color: "#424242", marginTop: 4 },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  cardTime: { fontSize: 12, color: "#757575" },
+  stats: { flexDirection: "row", alignItems: "center" },
+  statText: { marginLeft: 4, fontSize: 12, color: "#757575" },
   moreBtn: { padding: 8, justifyContent: "center" },
 });
 
