@@ -1,110 +1,140 @@
-// src/api/reminderApi.ts
 import axiosInstance from "./axiosInstance";
 
-/** ----- Types ----- **/
+/** ----- Enums & Types ----- **/
+export type ActionType =
+  | "WATERING"
+  | "PRUNING"
+  | "FERTILIZING"
+  | "PEST_CHECK"
+  | "HARVESTING"
+  | "SEEDING"
+  | "TRANSPLANTING"
+  | "SOIL_CHECK"
+  | "WEEDING"
+  | "OTHER";
 
-export type Frequency = "ONE_TIME" | "DAILY" | "WEEKLY" | "MONTHLY";
+export type ScheduleType = "FIXED" | "RECURRING";
+export type FrequencyType = "ONE_TIME" | "DAILY" | "WEEKLY" | "MONTHLY";
+export type WeekDay =
+  | "MONDAY"
+  | "TUESDAY"
+  | "WEDNESDAY"
+  | "THURSDAY"
+  | "FRIDAY"
+  | "SATURDAY"
+  | "SUNDAY";
 export type ReminderStatus = "PENDING" | "DONE" | "SKIPPED";
 
+/** ----- Request & Response DTOs ----- **/
 export interface CreateReminderRequest {
-  task: string;
-  gardenActivity: string;
-  specificTime?: string; // ISO 8601 string
-  frequency: Frequency;
+  title: string;
+  actionType: ActionType;
+  scheduleType: ScheduleType;
+  // only for FIXED
+  fixedDateTime?: string; // ISO 8601
+  // only for RECURRING
+  frequency?: FrequencyType;
+  timeOfDay?: string; // ISO 8601 time
+  daysOfWeek?: WeekDay[];
+  dayOfMonth?: number;
   status: ReminderStatus;
   gardenId: string;
 }
 
-export interface UpdateReminderRequest extends CreateReminderRequest {
-  id: string;
+export interface UpdateReminderRequest extends Partial<CreateReminderRequest> {
+  reminderId: string;
 }
 
 export interface ReminderResponse {
   id: string;
-  task: string;
-  gardenActivity: string;
-  specificTime?: string;
-  frequency: Frequency;
+  title: string;
+  actionType: ActionType;
+  scheduleType: ScheduleType;
+  fixedDateTime?: string;
+  frequency?: FrequencyType;
+  timeOfDay?: string;
+  daysOfWeek?: WeekDay[];
+  dayOfMonth?: number;
   status: ReminderStatus;
   gardenId: string;
+  gardenName: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string;
 }
 
-interface ApiSingleResponse<T> {
-  message: string;
+interface ApiResponse<T> {
+  message?: string;
   result: T;
 }
 
+/** ----- API Calls ----- **/
+
 /**
- * Fetch all reminders for the current user.
- * Backend trả về: { message: string, result: ReminderResponse[] }
+ * Get list of reminders, optionally filter by gardenId
+ * GET /api/reminders?gardenId=...
  */
-export const getMyReminders = async (
-  gardenId: string
-): Promise<ApiSingleResponse<ReminderResponse[]>> => {
-  const response = await axiosInstance.get<
-    ApiSingleResponse<ReminderResponse[]>
-  >(`/reminders/${gardenId}/me`);
+export const getReminders = async (
+  gardenId?: string
+): Promise<ApiResponse<ReminderResponse[]>> => {
+  const response = await axiosInstance.get<ApiResponse<ReminderResponse[]>>(
+    "/reminders",
+    { params: { gardenId } }
+  );
   return response.data;
 };
+
 /**
- * Fetch  reminders by ID.
- * Backend trả về: { message: string, result: ReminderResponse }
+ * Create a new reminder
+ * POST /api/reminders
  */
-export const getReminderById = async (
+export const createReminder = async (
+  payload: CreateReminderRequest
+): Promise<ApiResponse<ReminderResponse>> => {
+  const response = await axiosInstance.post<ApiResponse<ReminderResponse>>(
+    "/reminders",
+    payload
+  );
+  return response.data;
+};
+
+/**
+ * Update existing reminder by ID
+ * PUT /api/reminders/{id}
+ */
+export const updateReminder = async ({
+  reminderId,
+  ...rest
+}: UpdateReminderRequest): Promise<ApiResponse<ReminderResponse>> => {
+  console.log("Updating reminder with ID:", reminderId, "and data:", rest);
+  const response = await axiosInstance.put<ApiResponse<ReminderResponse>>(
+    `/reminders/${reminderId}`,
+    rest
+  );
+  return response.data;
+};
+
+/**
+ * Soft-delete a reminder by ID
+ * DELETE /api/reminders/{id}
+ */
+export const deleteReminder = async (
   id: string
-): Promise<ApiSingleResponse<ReminderResponse>> => {
-  const response = await axiosInstance.get<ApiSingleResponse<ReminderResponse>>(
+): Promise<ApiResponse<void>> => {
+  const response = await axiosInstance.delete<ApiResponse<void>>(
     `/reminders/${id}`
   );
   return response.data;
 };
 /**
- * Create a new reminder.
+ * Get reminder by ID
+ * GET /api/reminders/{reminderId}
  */
-export const createReminder = async (
-  data: CreateReminderRequest
-): Promise<ApiSingleResponse<ReminderResponse>> => {
-  const response = await axiosInstance.post<
-    ApiSingleResponse<ReminderResponse>
-  >("/reminders", data);
-  return response.data;
-};
-/**
- * Fetch all reminders for the current user.
- * Backend trả về: { message: string, result: ReminderResponse[] }
- */
-export const getMyRemindersAll = async (): Promise<
-  ApiSingleResponse<ReminderResponse[]>
-> => {
-  const response = await axiosInstance.get<
-    ApiSingleResponse<ReminderResponse[]>
-  >("/reminders/me");
-  return response.data;
-};
-/**
- * Update an existing reminder.
- */
-export const updateReminder = async (
-  data: UpdateReminderRequest
-): Promise<{ message: string }> => {
-  const response = await axiosInstance.put<{ message: string }>(
-    "/reminders",
-    data
-  );
-  return response.data;
-};
-
-/**
- * Delete one or more reminders by IDs.
- */
-export const deleteReminders = async (
-  ids: string[]
-): Promise<{ message: string }> => {
-  const response = await axiosInstance.delete<{ message: string }>(
-    "/reminders",
-    { data: ids }
+export const getReminderById = async (
+  id: string
+): Promise<ApiResponse<ReminderResponse>> => {
+  const response = await axiosInstance.get<ApiResponse<ReminderResponse>>(
+    `/reminders/${id}`
   );
   return response.data;
 };
