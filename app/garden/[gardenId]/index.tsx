@@ -399,7 +399,7 @@ const CreateGardenLayout = () => {
 
             <TouchableOpacity
               style={[styles.actionItem]}
-              onPress={() => router.push("/garden/123/chart")}
+              onPress={() => router.push(`/garden/${gardenId}/chart`)}
             >
               <Image source={images.chart} style={{ width: 24, height: 24 }} />
               <Text style={styles.actionText}>Chart</Text>
