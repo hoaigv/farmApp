@@ -1,5 +1,4 @@
-// src/screens/ReminderListScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   SafeAreaView,
   FlatList,
@@ -12,105 +11,111 @@ import {
 } from "react-native";
 import { Feather, Entypo } from "@expo/vector-icons";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
-import Header from "@/components/Header"; // Giả sử bạn có component Header
+import Header from "@/components/Header";
 import { router, useLocalSearchParams } from "expo-router";
 import {
-  getMyReminders,
-  deleteReminders,
+  getReminders,
+  deleteReminder,
   ReminderResponse,
 } from "@/api/reminderApi";
+import { useFocusEffect } from "@react-navigation/native";
 
-// Kiểu UI
-type Reminder = {
-  id: string;
-  action: string; // từ API.task
-  frequency: string; // mô tả
-  status: "active" | "completed" | "paused";
+// Map API status to UI status and color
+const STATUS_MAP: Record<
+  ReminderResponse["status"],
+  { label: string; color: string }
+> = {
+  PENDING: { label: "PENDING", color: "#28a745" },
+  DONE: { label: "DONE", color: "#6c757d" },
+  SKIPPED: { label: "SKIPPED", color: "#ffc107" },
 };
 
-// Map từ API status sang UI status
-const mapStatus = (status: ReminderResponse["status"]): Reminder["status"] => {
-  switch (status) {
-    case "PENDING":
-      return "active";
-    case "DONE":
-      return "completed";
-    case "SKIPPED":
-      return "paused";
-    default:
-      return "active";
-  }
-};
-
-// Format frequency + specificTime thành string hiển thị
-const formatFrequency = (
-  frequency: ReminderResponse["frequency"],
-  specificTime?: string
+// Format schedule/frequency display
+const formatSchedule = (
+  scheduleType: ReminderResponse["scheduleType"],
+  fixedDateTime?: string,
+  frequency?: ReminderResponse["frequency"],
+  timeOfDay?: string,
+  daysOfWeek?: ReminderResponse["daysOfWeek"],
+  dayOfMonth?: number
 ): string => {
-  let timeString = "";
-  if (specificTime) {
-    const dt = new Date(specificTime);
-    const hours = dt.getHours().toString().padStart(2, "0");
-    const minutes = dt.getMinutes().toString().padStart(2, "0");
-    timeString = `${hours}:${minutes}`;
+  if (scheduleType === "FIXED" && fixedDateTime) {
+    const dt = new Date(fixedDateTime);
+    return dt.toLocaleString();
   }
+
+  // RECURRING
+  let timeString = "";
+  if (timeOfDay) {
+    const t = new Date(`1970-01-01T${timeOfDay}`);
+    const hh = t.getHours().toString().padStart(2, "0");
+    const mm = t.getMinutes().toString().padStart(2, "0");
+    timeString = `${hh}:${mm}`;
+  }
+
   switch (frequency) {
     case "ONE_TIME":
-      if (specificTime) {
-        const dt = new Date(specificTime);
-        const day = dt.getDate().toString().padStart(2, "0");
-        const month = (dt.getMonth() + 1).toString().padStart(2, "0");
-        const year = dt.getFullYear();
-        return `Once: ${day}/${month}/${year}${
-          timeString ? ` at ${timeString}` : ""
-        }`;
-      }
-      return "Once";
+      return timeString ? `One time at ${timeString}` : "One time";
     case "DAILY":
       return timeString ? `Daily at ${timeString}` : "Daily";
     case "WEEKLY":
+      if (daysOfWeek && daysOfWeek.length) {
+        const days = daysOfWeek.map((d) => d.slice(0, 3)).join(", ");
+        return `${days} ${timeString ? `at ${timeString}` : ""}`.trim();
+      }
       return timeString ? `Weekly at ${timeString}` : "Weekly";
     case "MONTHLY":
+      if (dayOfMonth != null && dayOfMonth !== -1) {
+        return `Day ${dayOfMonth} ${
+          timeString ? `at ${timeString}` : ""
+        }`.trim();
+      }
       return timeString ? `Monthly at ${timeString}` : "Monthly";
     default:
-      return frequency;
+      return "";
   }
 };
 
-// Component ReminderItem với onPress
 const ReminderItem: React.FC<{
-  item: Reminder;
+  reminder: ReminderResponse;
   onDelete: (id: string) => void;
   onPress: () => void;
-}> = ({ item, onDelete, onPress }) => {
-  const statusColor = {
-    active: "#28a745",
-    completed: "#6c757d",
-    paused: "#ffc107",
-  }[item.status];
-
-  // render action khi swipe left
-  const renderRightActions = () => (
+}> = ({ reminder, onDelete, onPress }) => {
+  const { label, color } = STATUS_MAP[reminder.status];
+  const rightActions = () => (
     <TouchableOpacity
       style={styles.deleteButton}
-      onPress={() => onDelete(item.id)}
+      onPress={() => onDelete(reminder.id)}
     >
       <Entypo name="trash" size={24} color="red" />
     </TouchableOpacity>
   );
 
+  const freqString = useMemo(
+    () =>
+      formatSchedule(
+        reminder.scheduleType,
+        reminder.fixedDateTime,
+        reminder.frequency,
+        reminder.timeOfDay,
+        reminder.daysOfWeek,
+        reminder.dayOfMonth
+      ),
+    [reminder]
+  );
+
   return (
-    <Swipeable renderRightActions={renderRightActions}>
+    <Swipeable renderRightActions={rightActions}>
       <TouchableOpacity
-        style={[styles.itemContainer, { borderLeftColor: statusColor }]}
+        style={[styles.itemContainer, { borderLeftColor: color }]}
         onPress={onPress}
       >
         <View style={styles.itemContent}>
-          <Text style={styles.actionText}>{item.action}</Text>
-          <Text style={styles.freqText}>{item.frequency}</Text>
+          <Text style={styles.titleText}>{reminder.title}</Text>
+          <Text style={styles.subtitleText}>{freqString}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-          <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: color }]}>
+          <Text style={styles.statusText}>{label}</Text>
         </View>
       </TouchableOpacity>
     </Swipeable>
@@ -119,62 +124,69 @@ const ReminderItem: React.FC<{
 
 const ReminderListScreen: React.FC = () => {
   const { gardenId } = useLocalSearchParams<{ gardenId: string }>();
-  const [data, setData] = useState<Reminder[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [reminders, setReminders] = useState<ReminderResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
 
-  const fetchReminders = async () => {
+  const loadReminders = useCallback(async () => {
     try {
-      setLoading(true);
       setError(null);
-      const res = await getMyReminders(gardenId as string);
-      const remindersUI: Reminder[] = res.result.map((r) => ({
-        id: r.id,
-        action: r.task,
-        frequency: formatFrequency(r.frequency, r.specificTime),
-        status: mapStatus(r.status),
-      }));
-      setData(remindersUI);
-    } catch (e: any) {
-      console.error("Error fetching reminders:", e);
-      setError("Unable to load reminders");
+      const res = await getReminders(gardenId);
+      setReminders(res.result);
+    } catch (e) {
+      console.error(e);
+      setError("Failed to load reminders");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [gardenId]);
 
-  useEffect(() => {
-    fetchReminders();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      loadReminders();
+    }, [loadReminders])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchReminders();
+    loadReminders();
   };
 
   const handleDelete = async (id: string) => {
     try {
-      setData((prev) => prev.filter((item) => item.id !== id));
-      await deleteReminders([id]);
+      await deleteReminder(id);
+      setReminders((prev) => prev.filter((r) => r.id !== id));
     } catch (e) {
-      console.error("Delete error:", e);
-      fetchReminders();
+      console.error(e);
+      // fallback: reload all
+      loadReminders();
     }
   };
+
+  const renderItem = useCallback(
+    ({ item }: { item: ReminderResponse }) => (
+      <ReminderItem
+        reminder={item}
+        onDelete={handleDelete}
+        onPress={() =>
+          router.push(`/garden/${gardenId}/reminder/${item.id}?mode=edit`)
+        }
+      />
+    ),
+    [gardenId]
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <Header
         title="Reminders"
-        showBack={true}
+        showBack
         rightElement={
           <TouchableOpacity
-            style={{ paddingHorizontal: 8 }}
-            onPress={() => {
-              router.push(`/garden/${gardenId}/reminder/create`);
-            }}
+            onPress={() => router.push(`/garden/${gardenId}/reminder/create`)}
           >
             <Feather name="plus" size={26} color="black" />
           </TouchableOpacity>
@@ -182,41 +194,20 @@ const ReminderListScreen: React.FC = () => {
       />
       {loading && !refreshing ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" />
         </View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={{ color: "red" }}>{error}</Text>
-          <TouchableOpacity onPress={fetchReminders} style={styles.reloadBtn}>
-            <Text style={{ color: "#007AFF" }}>Try again</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={loadReminders} style={styles.reloadBtn}>
+            <Text>Try again</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={data}
+          data={reminders}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ReminderItem
-              item={item}
-              onDelete={handleDelete}
-              onPress={() => {
-                // Push sang màn hình edit với params
-                router.push({
-                  pathname: `/garden/${gardenId}/reminder/${item.id}`,
-                  params: {
-                    mode: "edit",
-                    reminder: JSON.stringify({
-                      id: item.id,
-                      task: item.action,
-                      frequency: item.frequency,
-                      status: item.status,
-                    }),
-                    gardenId,
-                  },
-                });
-              }}
-            />
-          )}
+          renderItem={renderItem}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           contentContainerStyle={styles.listContent}
           refreshControl={
@@ -224,7 +215,7 @@ const ReminderListScreen: React.FC = () => {
           }
           ListEmptyComponent={() => (
             <View style={styles.center}>
-              <Text>No reminder yet.</Text>
+              <Text>No reminders yet.</Text>
             </View>
           )}
         />
@@ -236,26 +227,12 @@ const ReminderListScreen: React.FC = () => {
 export default ReminderListScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  reloadBtn: {
-    marginTop: 8,
-  },
-  listContent: {
-    padding: 16,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "#eee",
-    marginVertical: 8,
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  errorText: { color: "red", marginBottom: 8 },
+  reloadBtn: { padding: 8 },
+  listContent: { padding: 16 },
+  separator: { height: 1, backgroundColor: "#eee", marginVertical: 8 },
   itemContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -264,29 +241,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#fafafa",
     borderRadius: 6,
   },
-  itemContent: {
-    flex: 1,
-  },
-  actionText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#333",
-  },
-  freqText: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    color: "#fff",
-    fontWeight: "600",
-  },
+  itemContent: { flex: 1 },
+  titleText: { fontSize: 16, fontWeight: "500", color: "#333" },
+  subtitleText: { fontSize: 14, color: "#666", marginTop: 2 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  statusText: { fontSize: 12, color: "#fff", fontWeight: "600" },
   deleteButton: {
     backgroundColor: "white",
     justifyContent: "center",

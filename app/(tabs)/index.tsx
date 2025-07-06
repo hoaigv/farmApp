@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   FlatList,
   ImageBackground,
@@ -7,20 +7,18 @@ import {
   Text,
   View,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
-
+import { useFocusEffect } from "@react-navigation/native";
 import { Avatar } from "react-native-paper";
+
 import NotificationBell from "../../components/NotificationBell";
 import WeatherCard from "../../components/WeatherCard";
 import useCustomFonts from "../../hook/FontLoader";
-
 import TodoList from "../../components/TodoList";
+
 import { fetchGardens, ListGardensResponse } from "../../api/gardenApi";
 import { fetchGardenCells, GardenCell } from "@/api/gardenCellApi";
-
-const ROWS_DEFAULT = 6;
-const COLS_DEFAULT = 6;
-const CELL_SIZE = (200 / COLS_DEFAULT) * 0.97;
 
 type Status = "normal" | "warning" | "alert";
 type CellValue = Status | null;
@@ -33,50 +31,60 @@ type GardenWithGrid = {
   colLength: number;
 };
 
-const HomeScreen = () => {
+const HomeScreen: React.FC = () => {
+  // Lấy chiều rộng màn hình để tính layout động
+  const { width: screenWidth } = useWindowDimensions();
+  const cardWidth = screenWidth * 0.9; // mỗi card chiếm 70% màn hình
+  // kích thước ô vuông grid
+
   const [gardens, setGardens] = useState<GardenWithGrid[]>([]);
   const [loading, setLoading] = useState(true);
   const [fontsLoaded] = useCustomFonts();
 
-  // Fetch garden data
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const listResp: ListGardensResponse = await fetchGardens({});
-        const gardensData = await Promise.all(
-          listResp.result.map(async (g) => {
-            const cellsResp = await fetchGardenCells({ gardenId: g.id });
-            const total = g.rowLength * g.colLength;
-            const grid: CellValue[] = Array(total).fill(null);
-            cellsResp.result.cells.forEach((cell: GardenCell) => {
-              const idx = cell.rowIndex * g.colLength + cell.colIndex;
-              grid[idx] =
-                cell.healthStatus === "NORMAL"
-                  ? "normal"
-                  : cell.healthStatus === "DISEASED"
-                  ? "warning"
-                  : "alert";
-            });
-            return {
-              id: g.id,
-              name: g.name,
-              grid,
-              rowLength: g.rowLength,
-              colLength: g.colLength,
-            };
-          })
-        );
-        setGardens(gardensData);
-      } catch (err) {
-        console.error("Error loading gardens:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
+  // Hàm fetch và build dữ liệu grid
+  const loadGardens = useCallback(async () => {
+    setLoading(true);
+    try {
+      const listResp: ListGardensResponse = await fetchGardens({});
+      const gardensData = await Promise.all(
+        listResp.result.map(async (g) => {
+          const cellsResp = await fetchGardenCells({ gardenId: g.id });
+          const total = g.rowLength * g.colLength;
+          const grid: CellValue[] = Array(total).fill(null);
+          cellsResp.result.cells.forEach((cell: GardenCell) => {
+            const idx = cell.rowIndex * g.colLength + cell.colIndex;
+            grid[idx] =
+              cell.healthStatus === "NORMAL"
+                ? "normal"
+                : cell.healthStatus === "DISEASED"
+                ? "warning"
+                : "alert";
+          });
+          return {
+            id: g.id,
+            name: g.name,
+            grid,
+            rowLength: g.rowLength,
+            colLength: g.colLength,
+          };
+        })
+      );
+      setGardens(gardensData);
+    } catch (err) {
+      console.error("Error loading gardens:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Memoized render functions
+  // Reload khi màn hình focus
+  useFocusEffect(
+    useCallback(() => {
+      loadGardens();
+    }, [loadGardens])
+  );
+
+  // Render grid của mỗi garden
   const renderGrid = useCallback(
     (garden: GardenWithGrid) => (
       <FlatList
@@ -93,8 +101,15 @@ const HomeScreen = () => {
               : item === "alert"
               ? "#e74c3c"
               : "transparent";
+
+          const CELL_SIZE =
+            (cardWidth / ((garden.colLength + garden.rowLength) / (2 * 0.95))) *
+            0.5; // Chiều rộng mỗi ô vuông
+
           return (
-            <View style={styles.cell}>
+            <View
+              style={[styles.cell, { width: CELL_SIZE, height: CELL_SIZE }]}
+            >
               {item && (
                 <View
                   style={[
@@ -103,7 +118,11 @@ const HomeScreen = () => {
                   ]}
                 >
                   <Text
-                    style={{ color: bgColor, fontSize: 22, fontWeight: "500" }}
+                    style={{
+                      color: bgColor,
+                      fontSize: CELL_SIZE * 0.6,
+                      fontWeight: "500",
+                    }}
                   >
                     +
                   </Text>
@@ -112,25 +131,24 @@ const HomeScreen = () => {
             </View>
           );
         }}
-        style={{ width: CELL_SIZE * garden.colLength }}
       />
     ),
-    []
+    [cardWidth]
   );
 
+  // Render mỗi card garden
   const renderGarden = useCallback(
     ({ item }: { item: GardenWithGrid }) => (
-      <View style={styles.noteCard}>
-        <View style={styles.headerRow} className="items-center">
+      <View style={[styles.noteCard]}>
+        <View className="flex-1 items-center px-2 ">
           <Text style={styles.noteTitle}>{item.name}</Text>
         </View>
-        <View className="items-center">{renderGrid(item)}</View>
+        <View>{renderGrid(item)}</View>
       </View>
     ),
-    [renderGrid]
+    [renderGrid, cardWidth]
   );
 
-  // Early return for loading state
   if (!fontsLoaded || loading) {
     return <ActivityIndicator size="large" style={styles.loader} />;
   }
@@ -159,7 +177,7 @@ const HomeScreen = () => {
         </View>
       </ImageBackground>
 
-      <View style={{ height: 280 }}>
+      <View style={{ flex: 1 }}>
         <FlatList
           data={gardens}
           keyExtractor={(g) => g.id}
@@ -185,7 +203,8 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: "row",
     alignItems: "center",
-    margin: 8,
+    marginHorizontal: 16,
+    marginVertical: 24,
     padding: 12,
     borderRadius: 8,
     overflow: "hidden",
@@ -198,27 +217,29 @@ const styles = StyleSheet.create({
     color: "white",
   },
   bannerSubtitle: { color: "rgba(255,255,255,0.9)" },
+
   listContent: {
     paddingHorizontal: 16,
-    height: 275,
-    alignItems: "center",
+    paddingBottom: 16,
     flexGrow: 1,
   },
+
   noteCard: {
-    marginRight: 16,
     backgroundColor: "#fff",
     borderRadius: 8,
-    elevation: 2,
-    padding: 8,
+    padding: 12,
+    marginRight: 16,
     borderWidth: 1,
-    borderColor: "#ddd",
-    width: 210,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 2,
   },
-  headerRow: { marginBottom: 8 },
+
   noteTitle: { fontSize: 16, fontWeight: "600" },
+
   cell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
     borderWidth: 1,
     borderColor: "#ccc",
     alignItems: "center",
@@ -230,6 +251,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 8,
   },
+
   notesLabel: {
     marginHorizontal: 16,
     fontSize: 22,

@@ -8,6 +8,10 @@ export default function NoteLayout() {
         name="index"
         options={{ title: "Reminders", headerShown: false }}
       />
+      <Stack.Screen
+        name="create"
+        options={{ title: "Reminders", headerShown: false }}
+      />
 
       <Stack.Screen
         name="[reminderId]"

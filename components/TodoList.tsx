@@ -6,11 +6,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import {
-  getMyRemindersAll,
+  getReminders,
   updateReminder,
   ReminderResponse,
+  ReminderStatus,
 } from "../api/reminderApi";
 
 const TodoList: React.FC = () => {
@@ -21,8 +23,8 @@ const TodoList: React.FC = () => {
   useEffect(() => {
     const fetchReminders = async () => {
       try {
-        const { result } = await getMyRemindersAll();
-        setReminders(result);
+        const { result } = await getReminders(); // Không truyền gardenId -> lấy toàn bộ
+        setReminders(result.filter((r) => r.status === "PENDING"));
       } catch (e: any) {
         console.error("Failed to load reminders", e);
         setError(e.message || "Error loading reminders");
@@ -33,66 +35,67 @@ const TodoList: React.FC = () => {
     fetchReminders();
   }, []);
 
-  /**
-   * Handle completing or skipping a reminder.
-   */
-  const handleAction = async (id: string, action: "complete" | "finalize") => {
-    const rem = reminders.find((r) => r.id === id);
-    if (!rem) return;
-    const newStatus = action === "complete" ? "DONE" : "SKIPPED";
+  const handleAction = async (id: string, action: ReminderStatus) => {
     try {
       await updateReminder({
-        ...rem,
-        status: newStatus,
+        reminderId: id,
+        status: action,
       });
       setReminders((prev) => prev.filter((r) => r.id !== id));
     } catch (e: any) {
-      console.error(`Failed to ${action} reminder`, e);
-      setError(`Unable to ${action} task`);
+      console.error(`Failed to update reminder`, e);
+      Alert.alert("Error", `Failed to mark as ${action}`);
     }
   };
 
-  const renderItem = ({ item }: { item: ReminderResponse }) => (
-    <View style={styles.itemContainer}>
-      <Text style={styles.text}>
-        <Text style={styles.bold}>Garden:</Text> {item.gardenActivity}
-      </Text>
-      <View style={styles.infoContainer}>
-        <View style={styles.info}>
-          <Text style={styles.text}>
-            <Text style={styles.bold}>Task:</Text> {item.task}
-          </Text>
-          <Text style={styles.text}>
-            <Text style={styles.bold}>Time:</Text>{" "}
-            {item.specificTime
-              ? new Date(item.specificTime).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "-"}
-          </Text>
-        </View>
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.completeButton]}
-            onPress={() => handleAction(item.id, "complete")}
-          >
-            <Text style={styles.buttonText}>Complete</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.finalizeButton]}
-            onPress={() => handleAction(item.id, "finalize")}
-          >
-            <Text style={styles.buttonText}>Finalize</Text>
-          </TouchableOpacity>
+  const renderItem = ({ item }: { item: ReminderResponse }) => {
+    const titleItem =
+      item.title.length > 30 ? item.title.slice(0, 30) + "..." : item.title;
+    const gardenNameItem =
+      item.gardenName.length > 20
+        ? item.gardenName.slice(0, 20) + "..."
+        : item.gardenName;
+    return (
+      <View style={styles.itemContainer}>
+        <Text style={styles.text}>
+          <Text style={styles.bold}>Title:</Text> {titleItem}
+        </Text>
+        <View style={styles.infoContainer}>
+          <View style={styles.info}>
+            <Text style={styles.text}>
+              <Text style={styles.bold}>Garden:</Text> {gardenNameItem}
+            </Text>
+            <Text style={styles.text}>
+              <Text style={styles.bold}>Time:</Text>{" "}
+              {item.scheduleType === "FIXED" && item.fixedDateTime
+                ? new Date(item.fixedDateTime).toLocaleString()
+                : item.timeOfDay
+                ? item.timeOfDay.slice(0, 5)
+                : "-"}
+            </Text>
+          </View>
+          <View style={styles.buttonsContainer}>
+            <TouchableOpacity
+              style={[styles.button, styles.completeButton]}
+              onPress={() => handleAction(item.id, "DONE")}
+            >
+              <Text style={styles.buttonText}>Complete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.finalizeButton]}
+              onPress={() => handleAction(item.id, "SKIPPED")}
+            >
+              <Text style={styles.buttonText}>Skip</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const ListEmpty = () => (
     <View style={styles.emptyContainer}>
-      <Text style={styles.emptyText}>No tasks available</Text>
+      <Text style={styles.emptyText}>No pending reminders</Text>
     </View>
   );
 
@@ -122,6 +125,8 @@ const TodoList: React.FC = () => {
     </View>
   );
 };
+
+export default TodoList;
 
 const styles = StyleSheet.create({
   loader: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -158,5 +163,3 @@ const styles = StyleSheet.create({
   emptyContainer: { justifyContent: "center", alignItems: "center" },
   emptyText: { fontSize: 16, color: "#888", fontWeight: "400" },
 });
-
-export default TodoList;
