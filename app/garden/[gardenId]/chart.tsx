@@ -1,239 +1,266 @@
-import React, { useState } from "react";
-import { Dimensions, SafeAreaView, StyleSheet, Text, View } from "react-native";
-import { BarChart, LineChart, PieChart } from "react-native-chart-kit";
-import { SceneMap, TabBar, TabView } from "react-native-tab-view";
-import Header from "../../../components/Header"; // Adjust the import path as necessary
+import React, { useState, useMemo, useCallback } from "react";
+import {
+  Dimensions,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { BarChart, PieChart, LineChart } from "react-native-chart-kit";
+import { TabBar, TabView } from "react-native-tab-view";
+import Header from "../../../components/Header";
+import { useLocalSearchParams, useFocusEffect } from "expo-router";
+import { fetchGardenLogs, GardenLogResponse } from "@/api/chartApi";
+// Đúng đường dẫn đến mock data
+import { healthData } from "@/mork/healthData";
+
 const screenWidth = Dimensions.get("window").width;
-const CarePieChart = () => {
-  const data = [
+
+// Mapping UUID từ backend về gardenId code trong mock
+const uuidToCode: Record<string, string> = {
+  "976404e9-2d80-46b6-9fa7-f733f7a2dcc8": "gdn-001",
+  // Thêm mapping tương ứng nếu có các UUID khác
+};
+
+// Utility to group logs
+function groupBy<T>(
+  array: T[],
+  keyFn: (item: T) => string
+): Record<string, number> {
+  return array.reduce((acc, item) => {
+    const key = keyFn(item);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+}
+
+// CARE ACTIVE: Pie + Bar charts
+const CareOverview: React.FC<{ logs: GardenLogResponse[] }> = ({ logs }) => {
+  const { wateringCount, fertilizingCount, skippedCount } = useMemo(
+    () =>
+      logs.reduce(
+        (acc, { actionType }) => {
+          if (actionType === "WATERING") acc.wateringCount++;
+          if (actionType === "FERTILIZING") acc.fertilizingCount++;
+          if (actionType === "SKIP") acc.skippedCount++;
+          return acc;
+        },
+        { wateringCount: 0, fertilizingCount: 0, skippedCount: 0 }
+      ),
+    [logs]
+  );
+
+  const pieData = [
     {
       name: "Watering",
-      population: 10,
-      color: "#4ade80", // green
+      population: wateringCount,
+      color: "#4ade80",
       legendFontColor: "#333",
       legendFontSize: 14,
     },
     {
       name: "Fertilizing",
-      population: 4,
-      color: "#facc15", // yellow
+      population: fertilizingCount,
+      color: "#facc15",
       legendFontColor: "#333",
       legendFontSize: 14,
     },
     {
       name: "Missed",
-      population: 2,
-      color: "#f87171", // red
+      population: skippedCount,
+      color: "#f87171",
       legendFontColor: "#333",
       legendFontSize: 14,
     },
   ];
-  const databar = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    datasets: [
-      {
-        data: [3, 2, 4, 1, 3, 5, 0], // Number of care activities each day
-      },
-    ],
-  };
+
+  const barData = useMemo(() => {
+    const counts = groupBy(
+      logs,
+      (log) =>
+        ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][
+          new Date(log.timestamp).getUTCDay()
+        ]
+    );
+    const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    return { labels, datasets: [{ data: labels.map((l) => counts[l] || 0) }] };
+  }, [logs]);
 
   const chartConfig = {
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
+    backgroundGradientFrom: "#fff",
+    backgroundGradientTo: "#fff",
+    color: (opacity = 1) => `rgba(34,197,94,${opacity})`,
+    labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
     fillShadowGradient: "#4ade80",
     fillShadowGradientOpacity: 1,
-    color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    barPercentage: 0.6,
   };
 
   return (
-    <View className="items-center p-2">
-      <Text
-        style={{
-          fontSize: 18,
-          fontWeight: "bold",
-          textAlign: "center",
-          marginBottom: 10,
-        }}
-      >
-        Plant Care Proportion
-      </Text>
+    <View style={styles.chartSection}>
+      <Text style={styles.sectionTitle}>Plant Care Overview</Text>
       <PieChart
-        data={data}
-        width={screenWidth}
-        height={220}
-        chartConfig={{
-          color: () => "#000",
-        }}
+        data={pieData}
+        width={screenWidth - 32}
+        height={180}
+        chartConfig={chartConfig}
         accessor="population"
         backgroundColor="transparent"
         paddingLeft="15"
         absolute
       />
-      <View>
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: "bold",
-            textAlign: "center",
-            marginBottom: 10,
-          }}
-        >
-          Daily Care Frequency
-        </Text>
-        <BarChart
-          data={databar}
-          width={screenWidth - 32}
-          height={220}
-          yAxisLabel=""
-          yAxisSuffix=""
-          chartConfig={chartConfig}
-          verticalLabelRotation={0}
-          showValuesOnTopOfBars={true}
-          fromZero={true}
-          style={{ borderRadius: 8 }}
-        />
-      </View>
-    </View>
-  );
-};
-
-const WeatherAreaChart = () => {
-  const data = {
-    labels: ["May 20", "May 21", "May 22", "May 23", "May 24"],
-    datasets: [
-      {
-        data: [32, 34, 35, 36, 33], // Temperature
-        color: (opacity = 1) => `rgba(255, 99, 132, ${opacity})`, // red
-        strokeWidth: 2,
-      },
-      {
-        data: [1, 2, 0, 3, 1], // Watering count
-        color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`, // green
-        strokeWidth: 2,
-      },
-    ],
-    legend: ["Temperature (°C)", "Watering (times)"],
-  };
-
-  const chartConfig = {
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    propsForDots: {
-      r: "4",
-      strokeWidth: "2",
-      stroke: "#888",
-    },
-  };
-
-  return (
-    <View className="p-2 items-center">
-      <Text
-        style={{
-          fontSize: 18,
-          fontWeight: "bold",
-          textAlign: "center",
-          marginBottom: 10,
-        }}
-      >
-        Weather Impact & Watering
-      </Text>
-      <LineChart
-        data={data}
+      <Text style={styles.sectionTitle}>Weekly Care Frequency</Text>
+      <BarChart
+        data={barData}
         width={screenWidth - 32}
-        height={260}
-        chartConfig={chartConfig}
-        bezier
+        height={200}
         fromZero
+        yAxisLabel=""
         yAxisSuffix=""
-        style={{ borderRadius: 8 }}
+        showValuesOnTopOfBars
+        chartConfig={chartConfig}
+        style={styles.chartStyle}
       />
     </View>
   );
 };
 
-const HealthLineChart = () => {
+// GARDEN STATUS: Line chart of healthData
+const HealthGardenChart: React.FC<{ gardenId: string }> = ({ gardenId }) => {
+  // Map UUID -> code
+  const code = uuidToCode[gardenId] || gardenId;
+
+  const records = useMemo(
+    () =>
+      healthData
+        .filter((r) => r.gardenId === code)
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        ),
+    [code]
+  );
+
+  if (!records.length) {
+    return (
+      <View style={styles.chartSection}>
+        <Text style={styles.sectionTitle}>Garden Status Over Time</Text>
+        <View style={styles.placeholderBox}>
+          <Text style={styles.placeholderText}>No health data available.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Chỉ lấy ngày (1-10) để nhãn bớt dày và dễ đọc
+  const labels = records.map((r) => `${new Date(r.createdAt).getDate()}`);
+  const normal = records.map((r) => r.normalCell);
+  const dead = records.map((r) => r.deadCell);
+  const disease = records.map((r) => r.diseaseCell);
+
   const data = {
-    labels: ["May 20", "May 21", "May 22", "May 23", "May 24"],
+    labels,
     datasets: [
-      {
-        data: [95, 93, 85, 88, 91],
-        strokeWidth: 2,
-        color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`,
-      },
+      { data: normal, color: () => "#4ade80", strokeWidth: 2 },
+      { data: dead, color: () => "#f87171", strokeWidth: 2 },
+      { data: disease, color: () => "#facc15", strokeWidth: 2 },
     ],
+    legend: ["Normal", "Dead", "Diseased"],
   };
 
   const chartConfig = {
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
+    backgroundGradientFrom: "#fff",
+    backgroundGradientTo: "#fff",
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    propsForDots: {
-      r: "4",
-      strokeWidth: "2",
-      stroke: "#4ade80",
-    },
+    color: (opacity = 1) => `rgba(34,197,94,${opacity})`,
+    labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+    propsForDots: { r: "3" },
   };
 
   return (
-    <View className="items-center p-2">
-      <Text
-        style={{
-          fontSize: 18,
-          fontWeight: "bold",
-          textAlign: "center",
-          marginBottom: 10,
-        }}
-      >
-        Plant Health Chart
-      </Text>
+    <View style={styles.chartSection}>
+      <Text style={styles.sectionTitle}>Garden Status Over Time</Text>
       <LineChart
         data={data}
         width={screenWidth - 32}
-        height={220}
+        height={240}
         chartConfig={chartConfig}
         bezier
-        style={{ borderRadius: 8 }}
-        fromZero
-        yAxisSuffix=" pts"
+        style={{ marginVertical: 8, borderRadius: 8 }}
       />
     </View>
   );
 };
 
-const renderScene = SceneMap({
-  care: CarePieChart,
-  health: HealthLineChart,
-  weather: WeatherAreaChart,
-});
+// Main ChartScreen
+const ChartScreen: React.FC = () => {
+  const params = useLocalSearchParams<{ gardenId?: string }>();
+  const gardenId = params.gardenId?.trim() || "";
 
-const ChartScreen = () => {
+  const [logs, setLogs] = useState<GardenLogResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadLogs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchGardenLogs(gardenId);
+      setLogs(res.result);
+    } catch (err) {
+      console.error(err);
+      setError("Unable to load logs.");
+    } finally {
+      setLoading(false);
+    }
+  }, [gardenId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadLogs();
+    }, [loadLogs])
+  );
+
   const [index, setIndex] = useState(0);
-  const [routes] = useState([
-    { key: "care", title: "CARE" },
-    { key: "health", title: "HEALTH" },
-    { key: "weather", title: "WEATHER" },
-  ]);
+  const routes = [
+    { key: "overview", title: "CARE ACTIVE" },
+    { key: "status", title: "GARDEN STATUS" },
+  ];
+
+  const renderScene = ({ route }: { route: any }) =>
+    route.key === "overview" ? (
+      <CareOverview logs={logs} />
+    ) : (
+      <HealthGardenChart gardenId={gardenId} />
+    );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <Header title="Chart Overview" showBack />
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+  if (error) Alert.alert("Error", error);
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
-      <Header title="Chart" showBack={true} />
+    <SafeAreaView style={styles.safeArea}>
+      <Header title="Chart Overview" showBack />
       <TabView
         navigationState={{ index, routes }}
         renderScene={renderScene}
         onIndexChange={setIndex}
-        initialLayout={{ width: Dimensions.get("window").width }}
+        initialLayout={{ width: screenWidth }}
         renderTabBar={(props) => (
           <TabBar
             {...props}
             indicatorStyle={{ backgroundColor: "#4ade80" }}
-            style={{ backgroundColor: "white" }}
-            activeColor="black"
+            style={{ backgroundColor: "#fff" }}
+            activeColor="#000"
             inactiveColor="gray"
           />
         )}
@@ -243,35 +270,27 @@ const ChartScreen = () => {
 };
 
 export default ChartScreen;
+
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
+  safeArea: { flex: 1, backgroundColor: "#fff" },
+  chartSection: { alignItems: "center", padding: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: "600", marginVertical: 8 },
+  chartStyle: { borderRadius: 8, marginVertical: 4 },
+  placeholderBox: {
+    width: screenWidth - 32,
+    height: 150,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderRadius: 8,
+    justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 16,
-    marginBottom: 10,
+    marginTop: 16,
   },
-  backArrow: {
-    fontSize: 24,
-    marginRight: 10,
+  placeholderText: {
+    fontSize: 14,
+    fontStyle: "italic",
+    color: "gray",
+    textAlign: "center",
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  tabContainer: {
-    padding: 16,
-    flex: 1,
-    backgroundColor: "white",
-    alignItems: "center",
-  },
-  sectionTitle: {
-    fontSize: 16,
-    marginVertical: 12,
-    fontWeight: "600",
-  },
-  legend: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 12,
-  },
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
 });
