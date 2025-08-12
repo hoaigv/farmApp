@@ -38,3 +38,11 @@ yarn-error.*
 
 app-example
 .env
+# Android build
+android/app/build/
+android/.gradle/
+android/.idea/
+
+# iOS build
+ios/build/
+ios/Pods/
