@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
+  ImageBackground,
 } from "react-native";
 import {
   fetchGardenCells,
@@ -24,15 +25,17 @@ import Header from "@/components/Header";
 import { images } from "../../../data/image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import InventoryModal from "@/components/InventoryModal";
-import { PlantInventory } from "@/api/plantIventoryApi";
+import { PlantInventoryEntry } from "@/api/plantIventoryApi";
 import {
   showError,
   showSuccess,
   showWarning,
 } from "@/utils/flashMessageService";
-import { FontAwesome5 } from "@expo/vector-icons";
 import { crops } from "../../../data/image";
 const { width } = Dimensions.get("window");
+import UpdateCellModal from "@/components/UpdateCellModal";
+import AutoCompleteDisease from "@/components/AutoCompleteDisease";
+import DisplayGardenCellModal from "@/components/DisplayGardenCellModalProps";
 type HealthCellStatus = "NORMAL" | "DISEASED" | "DEAD";
 const CreateGardenLayout = () => {
   const router = useRouter();
@@ -41,15 +44,104 @@ const CreateGardenLayout = () => {
   // === UI & Modal States ===
   const [modalVisible, setModalVisible] = useState<boolean>(false); // controls "Add Plant" modal
   const [action, setAction] = useState<
-    "add" | "remove" | "edit" | "position" | null
-  >("position"); // current user mode
+    "add" | "remove" | "edit" | "read" | null
+  >("read"); // current user mode
   const [loading, setLoading] = useState<boolean>(true); // spinner visibility during data fetch
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // === Grid Dimensions & Layout ===
   const [rows, setRows] = useState<number>(0); // number of grid rows
   const [cols, setCols] = useState<number>(0); // number of grid columns
   const total = rows * cols; // total cell count
-  const cellSize = (width / cols) * 0.9; // cell pixel size based on screen width
+  const cellSize = (width / cols) * 0.92; // cell pixel size based on screen width
+  const [displayCellModal, setDisplayCellModal] = useState<boolean>(false); // controls display cell modal
+  const [desplayCellData, setDisplayCellData] = useState<GardenCell | null>(
+    null
+  ); // data for display cell modal
+  const [imageCurrentCellUpdate, setImageCurrentCellUpdate] =
+    useState<string>(""); // image for current cell update
+  const hadnleUpdaetGrowStage = async () => {
+    if (selectedIds.length === 0) {
+      showWarning("Please select cells to update!");
+      return;
+    }
+    const updateList: UpdateGardenCellRequest[] = selectedIds
+      .map((id) => {
+        const cell = grid.find((c) => c?.id === id);
+        if (!cell) return undefined;
+        return {
+          id: cell.id,
+          nextStage: true, // cập nhật lên giai đoạn mới
+        } as UpdateGardenCellRequest;
+      })
+      .filter((req): req is UpdateGardenCellRequest => !!req);
+
+    try {
+      const payload: UpdateGardenCellsRequest = { gardenId, cells: updateList };
+      await updateGardenCellsBatch(payload);
+      await loadGardenCells();
+      showSuccess("Grow stage updated successfully!");
+      setSelectedIds([]);
+    } catch (err) {
+      console.error("Failed to update grow stage:", err);
+      showError("Failed to update grow stage.");
+    }
+  };
+  const handleUpdateImageCellCurrent = async () => {
+    console.log(
+      "Batch updating image for selected cells:",
+      selectedIds,
+      imageCurrentCellUpdate
+    );
+
+    if (!imageCurrentCellUpdate) {
+      showWarning("No image to update!");
+      return;
+    }
+
+    if (selectedIds.length === 0) {
+      showWarning("Please select cells to update!");
+      return;
+    }
+
+    // Tạo danh sách update cho tất cả selectedIds (nếu tìm thấy ô tương ứng trong grid)
+    const updateList: UpdateGardenCellRequest[] = selectedIds
+      .map((id) => {
+        const cell = grid.find((c) => c?.id === id);
+        if (!cell) return undefined;
+        return {
+          id: cell.id,
+          // giữ nguyên các trường khác là null / false như yêu cầu
+          rowIndex: null,
+          colIndex: null,
+          healthStatus: null,
+          diseaseName: null,
+          nextStage: false,
+          imgCellCurrent: imageCurrentCellUpdate,
+        } as UpdateGardenCellRequest;
+      })
+      .filter((req): req is UpdateGardenCellRequest => !!req);
+
+    if (updateList.length === 0) {
+      showWarning("No valid cells found to update.");
+      return;
+    }
+
+    try {
+      const payload: UpdateGardenCellsRequest = {
+        gardenId,
+        cells: updateList,
+      };
+
+      await updateGardenCellsBatch(payload);
+      await loadGardenCells();
+      showSuccess("Cell images updated successfully!");
+      setSelectedIds([]);
+      setAction("read");
+    } catch (err) {
+      console.error("Failed to update cell images (batch):", err);
+      showError("Failed to update cell images.");
+    }
+  };
 
   // === Grid Data States ===
   const [grid, setGrid] = useState<Array<GardenCell | null>>([]);
@@ -63,19 +155,39 @@ const CreateGardenLayout = () => {
     null
   ); // temp data for placement
   const [icons, setIcons] = useState<string>(); // icons for each cell
+  const [modalVisibleUpdate, setModalVisiblUpdate] = useState<boolean>(false);
+  const [selectedAction, setSelectedAction] = useState<string>("position"); // action to perform in edit mode
+  const [diseaseName, setDiseaseName] = useState<string | null>(null);
+  const [autoCompleteDisease, setAutoCompleteDisease] =
+    useState<boolean>(false);
+  const handleActionSelect = (updateAction: string) => {
+    // actionOrUrl will be 'growStage', 'healthStatus', or image URL
+
+    setSelectedAction(updateAction);
+
+    console.log("Selected action:", updateAction);
+  };
 
   /**
    * Toggles between "add" and "remove" modes.
    * Opens modal when entering add mode.
    */
+
   const toggleAction = (key: "add" | "remove" | "edit") => {
     setSelectedIds([]);
     setAction((prev) => {
       if (prev === key) {
         if (currentAddPlant !== null) setCurrentAddPlant(null);
         setgridSpaceWork(grid);
-        return "position"; // toggle off như cũ
+        return "read"; // toggle off như cũ
       }
+      if (prev === "edit" && modalVisibleUpdate === true) {
+        setModalVisiblUpdate(false);
+      }
+      if (key === "edit" && modalVisible === false) {
+        setModalVisiblUpdate(true);
+      }
+
       return key; // chọn mới
     });
     if (key === "add" && currentAddPlant === null) {
@@ -89,21 +201,28 @@ const CreateGardenLayout = () => {
    * @param inv - PlantInventory selected by user
    * @param qty - quantity to plant
    */
-  const handleCurrentAddPlant = (inv: PlantInventory, qty: number) => {
+  const handleCurrentAddPlant = (inv: PlantInventoryEntry, qty: number) => {
     setCurrentAddPlant({
       id: "",
       rowIndex: -1,
       colIndex: -1,
       quantity: qty,
       healthStatus: "NORMAL",
-      plantInventoryId: inv.id,
-      icon: inv.icon || "",
+      diseaseName: null,
+      plantVariety: inv.plantVariety,
+      stageLink: "",
+      stageGrow: "",
+      createdAt: new Date().toISOString(),
+      imgCellCurrent: "",
     });
-    setIcons(inv.icon);
+    setIcons(inv.plantVariety.iconLink || ""); // set icon for the cell
   };
 
   const handleSelectPress = (id: string) => {
-    if (action === "position") {
+    if (action === "read") {
+      return;
+    }
+    if (selectedAction === "position") {
       if (selectedIds.at(0) === id) {
         setSelectedIds([]);
         return;
@@ -116,7 +235,7 @@ const CreateGardenLayout = () => {
       : [...selectedIds, id];
     setSelectedIds(newSelected);
   };
-
+  console.log("console", selectedAction);
   /**
    * Places the selected plant in the tapped cell when in add mode.
    * @param index - flat index of cell in grid array
@@ -134,14 +253,18 @@ const CreateGardenLayout = () => {
     const rowIndex = Math.floor(index / cols);
     const colIndex = index % cols;
     const updated: GardenCell = { ...currentAddPlant, rowIndex, colIndex };
-    console.log("Adding cell at index:", index, "with data:", updated);
+
     // buffer for API batch upsert
     setGridAdd((prev) => [...prev, updated]);
 
     // immediate UI update
     setgridSpaceWork((prev) => {
       const newGrid = [...prev];
-      newGrid[index] = updated;
+      // Ở đây chỉ sửa newGrid[index] để thêm stageLink
+      newGrid[index] = {
+        ...updated,
+        stageLink: icons ?? "", // chỉ thêm thuộc tính này cho UI
+      };
       return newGrid;
     });
   };
@@ -172,21 +295,22 @@ const CreateGardenLayout = () => {
     } catch (err: any) {
       console.error(err);
       showError(err.response?.data?.message || err.message);
+    } finally {
+      setAction("read");
     }
   };
 
   /**
    * Saves all buffered new cells to backend via batch upsert.
    */
-  console.info("Saving cells:", gridAdd.length);
+
   const handleSaveCellsPress = async () => {
     const toAdd = gridAdd.filter((c): c is GardenCell => c !== null);
     if (toAdd.length === 0) {
-      console.info("No new cells to save");
       return;
     }
     const payload: UpsertGardenCell[] = toAdd.map((c) => ({
-      plantInventoryId: c.plantInventoryId,
+      varietyId: c.plantVariety.id,
       rowIndex: c.rowIndex,
       colIndex: c.colIndex,
       quantity: c.quantity,
@@ -194,7 +318,7 @@ const CreateGardenLayout = () => {
     try {
       const res = await upsertGardenCells(gardenId, payload);
       loadGardenCells();
-      setAction("position");
+      setAction("read");
       setCurrentAddPlant(null);
       showSuccess(res.message);
     } catch (err) {
@@ -203,9 +327,12 @@ const CreateGardenLayout = () => {
   };
 
   const handleUpdatePostion = async (index: number) => {
+    console.log("Updating position for index:", index);
     if (selectedIds.length === 0) return;
+
     const movingCell = grid.find((item) => item?.id === selectedIds.at(0));
     if (!movingCell) return;
+
     movingCell.colIndex = Math.floor(index / cols);
     movingCell.rowIndex = index % cols;
 
@@ -215,10 +342,11 @@ const CreateGardenLayout = () => {
           id: movingCell.id,
           rowIndex: movingCell.colIndex,
           colIndex: movingCell.rowIndex,
-          healthStatus: movingCell.healthStatus,
-        },
+
+          nextStage: false,
+        } as UpdateGardenCellRequest,
       ];
-      const payload: UpdateGardenCellsRequest = { cells: batch };
+      const payload: UpdateGardenCellsRequest = { gardenId, cells: batch };
       await updateGardenCellsBatch(payload);
       await loadGardenCells();
     } catch (err) {
@@ -227,12 +355,32 @@ const CreateGardenLayout = () => {
 
     setSelectedIds([]);
   };
-  const handleUpdateHealthStatusPress = async (status: HealthCellStatus) => {
+
+  const handleDiseaseNameChange = (name: string) => {
+    console.log("Selected disease name:", name);
+    if (!name) return;
+    // update your state for display
+    setDiseaseName(name);
+    // immediately do the health-status change
+    // close the autocomplete
+    setAutoCompleteDisease(false);
+    handleUpdateHealthStatusPress("DISEASED", name);
+  };
+
+  const handleUpdateHealthStatusPress = async (
+    status: HealthCellStatus,
+    nameDisea?: string
+  ) => {
+    console.log("Updating health status to:", nameDisea, status);
     if (selectedIds.length === 0) {
       showWarning("Please select cells to update!");
       return;
     }
 
+    if (status === "DISEASED" && !diseaseName && !nameDisea) {
+      showWarning("Please enter disease name!");
+      return;
+    }
     // Tạo danh sách ô cần cập nhật
     const updateList: UpdateGardenCellRequest[] = selectedIds
       .map((id) => {
@@ -241,15 +389,22 @@ const CreateGardenLayout = () => {
         cell.healthStatus = status;
         return {
           id: cell.id,
-          rowIndex: cell.rowIndex,
-          colIndex: cell.colIndex,
+          rowIndex: null,
+          colIndex: null,
           healthStatus: cell.healthStatus,
+          diseaseName:
+            status === "DISEASED"
+              ? nameDisea
+                ? nameDisea
+                : diseaseName
+              : null,
+          nextStage: false, // không cập nhật giai đoạn mới
         } as UpdateGardenCellRequest;
       })
       .filter((req): req is UpdateGardenCellRequest => !!req);
 
     try {
-      const payload: UpdateGardenCellsRequest = { cells: updateList };
+      const payload: UpdateGardenCellsRequest = { gardenId, cells: updateList };
       await updateGardenCellsBatch(payload);
       await loadGardenCells();
       showSuccess("Health status updated successfully!");
@@ -269,6 +424,8 @@ const CreateGardenLayout = () => {
     try {
       console.log("Loading");
       const data = await fetchGardenCells({ gardenId });
+      console.log("Fetched garden cells:", data.result.cells);
+
       const { rowLength, colLength, cells: fetchedCells } = data.result;
 
       setRows(rowLength);
@@ -308,11 +465,16 @@ const CreateGardenLayout = () => {
       </SafeAreaView>
     );
   }
+
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <Header title="Garden" showBack={true} />
-      <View style={{ flex: 1, backgroundColor: "#00C48C", paddingVertical: 8 }}>
-        <View className="bg-white mx-2 rounded-lg p-1">
+    <ImageBackground
+      source={require("@/assets/images/backgournd.png")}
+      className="flex-1"
+      resizeMode="cover"
+    >
+      <SafeAreaView style={{ flex: 1 }}>
+        <Header title="Garden" showBack={true} />
+        <View className=" mx-2 rounded-lg p-1">
           <View style={styles.toolbar}>
             {/* Add Button */}
             <TouchableOpacity
@@ -323,25 +485,48 @@ const CreateGardenLayout = () => {
               onPress={() => toggleAction("add")}
             >
               {currentAddPlant ? (
-                <>
+                <View>
                   <Image
-                    source={crops[icons as keyof typeof crops]} // Replace with actual image source
+                    source={{
+                      uri: icons,
+                    }}
                     className="w-6 h-6"
                   />
-                  <Text style={{ fontSize: 12 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      position: "absolute",
+                      bottom: -12,
+                      fontWeight: "bold",
+                    }}
+                  >
                     X {currentAddPlant.quantity}
                   </Text>
-                </>
+                </View>
               ) : (
                 <>
                   <Image
                     source={images.gardening}
                     style={{ width: 24, height: 24 }}
                   />
-                  <Text style={styles.actionText}>Add</Text>
                 </>
               )}
             </TouchableOpacity>
+            <UpdateCellModal
+              visible={modalVisibleUpdate}
+              onDismiss={() => {
+                setModalVisiblUpdate(false);
+                setAction("edit");
+              }}
+              onActionSelect={handleActionSelect}
+              setImage={setImageCurrentCellUpdate}
+            />
+            <AutoCompleteDisease
+              visible={autoCompleteDisease}
+              onCancel={() => setAutoCompleteDisease(false)}
+              onOk={handleDiseaseNameChange}
+              initialValue={diseaseName || ""}
+            />
 
             {/* Remove Button */}
             <TouchableOpacity
@@ -352,7 +537,6 @@ const CreateGardenLayout = () => {
               onPress={() => toggleAction("remove")}
             >
               <Image source={images.shovel} style={{ width: 24, height: 24 }} />
-              <Text style={styles.actionText}>Remove</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -362,8 +546,27 @@ const CreateGardenLayout = () => {
               ]}
               onPress={() => toggleAction("edit")}
             >
-              <Image source={images.update} style={{ width: 24, height: 24 }} />
-              <Text style={styles.actionText}>Update</Text>
+              {selectedAction === "image" ? (
+                <>
+                  <Image
+                    source={{ uri: imageCurrentCellUpdate }}
+                    style={{ width: 24, height: 24 }}
+                  />
+                </>
+              ) : (
+                <>
+                  <Image
+                    source={
+                      selectedAction === "position"
+                        ? images.update
+                        : selectedAction === "growStage"
+                        ? images.progress
+                        : images.status
+                    }
+                    style={{ width: 24, height: 24 }}
+                  />
+                </>
+              )}
             </TouchableOpacity>
 
             {/* Other Tools (static) */}
@@ -375,60 +578,27 @@ const CreateGardenLayout = () => {
                 source={images.reminder}
                 style={{ width: 24, height: 24 }}
               />
-              <Text style={styles.actionText}>Reminder</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionItem}
               onPress={() => router.push(`/garden/${gardenId}/note`)}
             >
               <Image source={images.pencil} style={{ width: 24, height: 24 }} />
-              <Text style={styles.actionText}>Note</Text>
             </TouchableOpacity>
-          </View>
-          <View style={styles.toolbar}>
-            <TouchableOpacity
-              style={styles.actionItem}
-              onPress={() => router.push("/inventory")}
-            >
-              <Image
-                source={images.warehouse}
-                style={{ width: 24, height: 24 }}
-              />
-              <Text style={styles.actionText}>Inventory</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity
               style={[styles.actionItem]}
               onPress={() => router.push(`/garden/${gardenId}/chart`)}
             >
               <Image source={images.chart} style={{ width: 24, height: 24 }} />
-              <Text style={styles.actionText}>Chart</Text>
             </TouchableOpacity>
           </View>
         </View>
-        <View className="px-2 pt-3 flex-row items-center justify-between">
-          {action === "add" && (
-            <TouchableOpacity
-              onPress={() => handleSaveCellsPress()}
-              className="mr-2 bg-white py-1 px-3  rounded-sm"
-            >
-              <Text className="font-bold">Save</Text>
-            </TouchableOpacity>
-          )}
-          {action === "remove" && (
-            <TouchableOpacity
-              onPress={() => handleDeleteCellPress()}
-              className="mr-2 bg-white py-1 px-3  rounded-sm"
-            >
-              <Text className="font-bold">Delete</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+
         <InventoryModal
           visible={modalVisible}
           onDismiss={() => {
             console.log("Dismiss");
-            setAction("position");
+            setAction("read");
             setModalVisible(false);
           }}
           onConfirm={(inv, qty) => {
@@ -436,40 +606,16 @@ const CreateGardenLayout = () => {
             setModalVisible(false);
           }}
         />
-        {action === "edit" && (
-          <View className=" flex-row items-center justify-around w-full ">
-            {/* NORMAL */}
-            <TouchableOpacity
-              onPress={() => handleUpdateHealthStatusPress("NORMAL")}
-              className="flex-row items-center px-4 py-2 bg-green-500 rounded-2xl shadow"
-            >
-              <FontAwesome5 name="check-circle" size={20} color="white" />
-              <Text className="ml-2 text-white font-medium">NORMAL</Text>
-            </TouchableOpacity>
-
-            {/* DISEASED */}
-            <TouchableOpacity
-              onPress={() => handleUpdateHealthStatusPress("DISEASED")}
-              className="flex-row items-center px-4 py-2 bg-yellow-500 rounded-2xl shadow"
-            >
-              <FontAwesome5 name="bug" size={20} color="white" />
-              <Text className="ml-2 text-white font-medium">DISEASED</Text>
-            </TouchableOpacity>
-
-            {/* DEAD */}
-            <TouchableOpacity
-              onPress={() => handleUpdateHealthStatusPress("DEAD")}
-              className="flex-row items-center px-4 py-2 bg-red-500 rounded-2xl shadow"
-            >
-              <FontAwesome5 name="times-circle" size={20} color="white" />
-              <Text className="ml-2 text-white font-medium">DEAD</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <DisplayGardenCellModal
+          visible={displayCellModal}
+          onDismiss={() => setDisplayCellModal(false)}
+          data={desplayCellData || undefined}
+        />
         <FlatList
           data={
             selectedIds.length > 0 || action === "add" ? gridSpaceWork : grid
           }
+          scrollEnabled={false}
           renderItem={({ item, index }) => {
             // let isSelected = false;
             // if (item !== null) {
@@ -491,28 +637,37 @@ const CreateGardenLayout = () => {
                   {
                     width: cellSize,
                     height: cellSize,
-                    borderWidth: 4,
-                    margin: 3,
-                    borderColor: "#A52A2A",
+                    borderWidth: 1,
+                    borderColor: "#fff",
                     alignItems: "center",
                     justifyContent: "center",
-                    padding: 2,
-                    borderRadius: 10,
-                    backgroundColor: "#FF7F50",
+                    backgroundColor: "#2E8B57",
                   },
                 ]}
                 onPress={() => {
+                  console.log("Pressed cell at index:", index);
+                  console.log("Action:", action);
                   if (action === "add") handleAddCellPress(index);
                   if (
                     (action === "remove" ||
-                      action === "edit" ||
-                      action === "position") &&
+                      selectedAction === "healthStatus" ||
+                      selectedAction === "growStage" ||
+                      selectedAction === "position" ||
+                      selectedAction === "image") &&
                     item
                   ) {
                     handleSelectPress(item.id);
                   }
-                  if (action === "position" && item === null) {
+                  if (
+                    selectedAction === "position" &&
+                    item === null &&
+                    action === "edit"
+                  ) {
                     handleUpdatePostion(index);
+                  }
+                  if (action === "read" && item) {
+                    setDisplayCellModal(true);
+                    setDisplayCellData(item);
                   }
                 }}
                 // onLongPress={() => handleCellLongPress(index)}
@@ -522,12 +677,11 @@ const CreateGardenLayout = () => {
                   <View
                     style={[
                       {
-                        width: cellSize * 0.8,
-                        height: cellSize * 0.8,
+                        width: cellSize * 0.9,
+                        height: cellSize * 0.9,
                         alignItems: "center",
                         justifyContent: "center",
                         backgroundColor: "white",
-                        borderRadius: 10,
                         borderWidth: 5,
                       },
                       selectedIds.length > 0 && selectedIds.includes(item.id)
@@ -544,6 +698,7 @@ const CreateGardenLayout = () => {
                           position: "absolute",
                           top: cellSize * 0.025, // 10% padding from top
                           left: cellSize * 0.025, // 10% padding from left
+                          zIndex: 2,
                         }}
                       />
                     )}
@@ -556,16 +711,19 @@ const CreateGardenLayout = () => {
                           position: "absolute",
                           top: cellSize * 0.025, // 10% padding from top
                           left: cellSize * 0.025, // 10% padding from left
+                          zIndex: 2,
                         }}
                       />
                     )}
                     {/* cây to nhỏ theo cellSize */}
-                    {item.icon ? (
+                    {item.imgCellCurrent ? (
                       <Image
-                        source={crops[item.icon as keyof typeof crops]} // Replace with actual image source
+                        source={{ uri: item.imgCellCurrent }} // Replace with actual image source
                         style={{
-                          width: cellSize * 0.4, // 80% of cellSize
-                          height: cellSize * 0.4, // 80% of cellSize
+                          width: cellSize * 0.75, // 80% of cellSize
+                          height: cellSize * 0.75, // 80% of cellSize
+                          borderRadius: 10,
+                          zIndex: 1,
                         }}
                       />
                     ) : (
@@ -577,8 +735,6 @@ const CreateGardenLayout = () => {
                         🌳
                       </Text>
                     )}
-
-                    {/* số lượng cũng scale và đặt vị trí dynamic */}
                     <Text
                       style={{
                         position: "absolute",
@@ -586,6 +742,9 @@ const CreateGardenLayout = () => {
                         right: cellSize * 0.04, // 5% padding from right
                         fontSize: cellSize * 0.15, // 20% of cellSize
                         fontWeight: "600",
+                        zIndex: 2,
+                        color: "white",
+                        marginRight: 4,
                       }}
                     >
                       X {item.quantity}
@@ -602,9 +761,76 @@ const CreateGardenLayout = () => {
             justifyContent: "center",
             marginVertical: 8,
           }}
+          ListFooterComponent={
+            <View className="px-2 pt-12 flex-row items-center justify-between">
+              {action === "add" && (
+                <TouchableOpacity
+                  onPress={() => handleSaveCellsPress()}
+                  className="mr-2 bg-white py-1 px-3  rounded-sm"
+                >
+                  <Text className="font-bold">Save</Text>
+                </TouchableOpacity>
+              )}
+              {action === "edit" && selectedAction === "image" && (
+                <TouchableOpacity
+                  onPress={() => handleUpdateImageCellCurrent()}
+                  className="mr-2 bg-white py-1 px-3  rounded-sm"
+                >
+                  <Text className="font-bold">Save</Text>
+                </TouchableOpacity>
+              )}
+              {action === "remove" && (
+                <TouchableOpacity
+                  onPress={() => handleDeleteCellPress()}
+                  className="mr-2 bg-white py-1 px-3  rounded-sm"
+                >
+                  <Text className="font-bold">Delete</Text>
+                </TouchableOpacity>
+              )}
+              {action === "edit" && selectedAction === "growStage" && (
+                <TouchableOpacity
+                  onPress={() => {
+                    hadnleUpdaetGrowStage();
+                    setSelectedAction("growStage");
+                  }}
+                  className="mr-2 bg-white py-1 px-3  rounded-sm"
+                >
+                  <Text className="font-bold">Update Grow Stage</Text>
+                </TouchableOpacity>
+              )}
+              {action === "edit" && selectedAction === "healthStatus" && (
+                <View className="flex-row items-center gap-6">
+                  <TouchableOpacity
+                    onPress={() => handleUpdateHealthStatusPress("NORMAL")}
+                    className="mr-2 bg-primary py-2 px-3  rounded-xl"
+                  >
+                    <Text className="font-bold text-white">Normal</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (selectedIds.length === 0) {
+                        showWarning("Please select cells to update!");
+                        return;
+                      }
+                      setAutoCompleteDisease(true);
+                    }}
+                    className="mr-2 bg-amber-400 py-2 px-3  rounded-xl"
+                  >
+                    <Text className="font-bold text-white">Diseased</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleUpdateHealthStatusPress("DEAD")}
+                    className="mr-2 bg-orange-700 py-2 px-3  rounded-xl"
+                  >
+                    <Text className="font-bold text-white">Dead</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          }
         />
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
@@ -616,13 +842,22 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     overflow: "hidden",
     padding: 1,
+    gap: 8,
   },
   actionItem: {
-    flex: 1 / 5,
-    paddingVertical: 6,
+    flex: 1 / 6,
+    padding: 14,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 10,
+    borderRadius: "50%",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#ccc",
+    backgroundColor: "white",
+    shadowColor: "black", // Màu bóng
+    shadowOffset: { width: 0, height: 2 }, // Độ lệch
+    shadowOpacity: 0.25, // Độ mờ
+    shadowRadius: 3.84, // Bán kính
   },
   actionText: {
     fontSize: 12,
@@ -630,6 +865,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   actionActive: {
-    backgroundColor: "rgba(0, 196, 140, 0.3)",
+    borderColor: "#000080",
   },
 });

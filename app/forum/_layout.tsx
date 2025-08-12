@@ -16,6 +16,10 @@ export default function BunkerLayout() {
         name="history"
         options={{ title: "History", headerShown: false }}
       />
+      <Stack.Screen
+        name="search"
+        options={{ title: "Search Posts", headerShown: false }}
+      />
     </Stack>
   );
 }

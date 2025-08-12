@@ -19,12 +19,14 @@ type Props = {
   post: PostType;
   onComment: (id: string) => void;
   onImagePress: (uri: string) => void;
+  isDetail?: boolean; // Optional prop to indicate if this is a detailed view
 };
 
 export default function PostComponent({
   post,
   onComment,
   onImagePress,
+  isDetail = false,
 }: Props) {
   const { id, userAvatar, userName, createdAt, body, imageLink, totalComment } =
     post;
@@ -43,7 +45,11 @@ export default function PostComponent({
   const [isLike, setIsLike] = useState(post.isLike);
   const [likeCount, setLikeCount] = useState(post.totalLike);
 
-  const preview = body.length > 100 ? body.slice(0, 100) + "…" : body;
+  const preview = isDetail
+    ? body
+    : body.length > 100
+    ? body.slice(0, 100) + "..."
+    : body;
 
   const handleLike = async () => {
     try {
@@ -64,7 +70,14 @@ export default function PostComponent({
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Image source={{ uri: userAvatar }} style={styles.avatar} />
+        <Image
+          source={{
+            uri: userAvatar
+              ? userAvatar
+              : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSZfYb4CWzn9zbn-jLTwei46uk0dMEgMsh3gQ&s",
+          }}
+          style={styles.avatar}
+        />
         <View style={styles.headerText}>
           <Text style={styles.username}>{userName}</Text>
           <Text style={styles.time}>{timeAgo}</Text>

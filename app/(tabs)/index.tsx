@@ -10,7 +10,6 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { Avatar } from "react-native-paper";
 
 import NotificationBell from "../../components/NotificationBell";
 import WeatherCard from "../../components/WeatherCard";
@@ -41,17 +40,31 @@ const HomeScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [fontsLoaded] = useCustomFonts();
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+
+    if (hour >= 5 && hour < 11) {
+      return "Good morning, gardener!";
+    } else if (hour >= 11 && hour < 13) {
+      return "Good noon, gardener!";
+    } else if (hour >= 13 && hour < 18) {
+      return "Good afternoon, gardener!";
+    } else {
+      return "Good evening, gardener!";
+    }
+  };
+
   // Hàm fetch và build dữ liệu grid
   const loadGardens = useCallback(async () => {
     setLoading(true);
     try {
-      const listResp: ListGardensResponse = await fetchGardens({});
+      const listResp: ListGardensResponse = await fetchGardens();
       const gardensData = await Promise.all(
         listResp.result.map(async (g) => {
           const cellsResp = await fetchGardenCells({ gardenId: g.id });
           const total = g.rowLength * g.colLength;
           const grid: CellValue[] = Array(total).fill(null);
-          cellsResp.result.cells.forEach((cell: GardenCell) => {
+          cellsResp.result.cells?.forEach((cell: GardenCell) => {
             const idx = cell.rowIndex * g.colLength + cell.colIndex;
             grid[idx] =
               cell.healthStatus === "NORMAL"
@@ -99,6 +112,8 @@ const HomeScreen: React.FC = () => {
               : item === "warning"
               ? "#f1c40f"
               : item === "alert"
+              ? "gray"
+              : item === null
               ? "#e74c3c"
               : "transparent";
 
@@ -154,58 +169,60 @@ const HomeScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <WeatherCard />
-        <NotificationBell />
-      </View>
-
-      <ImageBackground
-        source={require("../../assets/images/tip_background.png")}
-        resizeMode="cover"
-        style={styles.banner}
-      >
-        <Avatar.Image
-          size={54}
-          source={require("../../assets/images/chat_logo.png")}
-        />
-        <View style={styles.bannerText}>
-          <Text style={styles.bannerTitle}>AI irrigation tips for you</Text>
-          <Text style={styles.bannerSubtitle}>
-            Water your plants every 2 days
-          </Text>
+    <ImageBackground
+      source={require("../../assets/images/backgournd.png")}
+      className="flex-1"
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.topBar}>
+          <WeatherCard />
+          <NotificationBell />
         </View>
-      </ImageBackground>
 
-      <View style={{ flex: 1 }}>
-        <FlatList
-          data={gardens}
-          keyExtractor={(g) => g.id}
-          renderItem={renderGarden}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-        />
-      </View>
+        <ImageBackground
+          source={require("../../assets/images/tip_background.png")}
+          resizeMode="cover"
+          style={styles.banner}
+        >
+          <View style={styles.bannerText}>
+            <Text style={styles.bannerTitle}>{getGreeting()}</Text>
+            <Text style={styles.bannerSubtitle}>
+              It`s a great time to start something new!
+            </Text>
+          </View>
+        </ImageBackground>
 
-      <Text style={styles.notesLabel}>Notes:</Text>
-      <TodoList />
-    </SafeAreaView>
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={gardens}
+            keyExtractor={(g) => g.id}
+            renderItem={renderGarden}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+          />
+        </View>
+
+        <Text style={styles.notesLabel}>Notes:</Text>
+        <TodoList />
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
 export default HomeScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "white" },
+  container: { flex: 1 },
   loader: { flex: 1, justifyContent: "center", alignItems: "center" },
   topBar: { flexDirection: "row", justifyContent: "space-between", padding: 8 },
   banner: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 16,
+    marginHorizontal: 8,
     marginVertical: 24,
-    padding: 12,
+    padding: 10,
     borderRadius: 8,
     overflow: "hidden",
     height: 100,

@@ -26,14 +26,26 @@ const SORT_OPTIONS = [
   { key: "oldest", label: "Oldest" },
 ];
 
-type HistoryItem = PostSummary & {
+type RawPost = {
+  id: string;
+  body: string;
+  imageLink?: string;
+  isLike?: boolean;
+  totalComment?: number;
+  totalLike?: number;
+  userName?: string;
+  userLink?: string;
+  createdAt: string;
+};
+
+type HistoryItem = RawPost & {
   type: "post" | "liked" | "commented";
 };
 
 const HistoryScreen = () => {
   const [activeFilter, setActiveFilter] = useState<string>("posts");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [data, setData] = useState<PostSummary[]>([]);
+  const [data, setData] = useState<RawPost[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
 
@@ -41,36 +53,24 @@ const HistoryScreen = () => {
     setLoading(true);
     const loadHistory = async () => {
       try {
-        // Chuẩn bị filter cho API (không bao gồm sort)
-        const filters: MyPostsFilters = {};
-        if (activeFilter === "liked") {
-          filters.isLike = true;
-        } else if (activeFilter === "commented") {
-          filters.isComment = true;
-        }
+        const filters: MyPostsFilters = {
+          sortBy: "createdAt",
+          sortDir: sortOrder === "newest" ? "desc" : "asc",
+        };
+        if (activeFilter === "liked") filters.isLike = true;
+        else if (activeFilter === "commented") filters.isComment = true;
 
-        // Gọi API với query params
-        const { result } = await fetchMyPosts(filters);
-
-        // Sort tại client theo createdAt
-        const sortedItems = result.sort((a, b) => {
-          const timeA = new Date(a.createdAt).getTime();
-          const timeB = new Date(b.createdAt).getTime();
-          return sortOrder === "newest" ? timeB - timeA : timeA - timeB;
-        });
-
-        setData(sortedItems);
+        const response = await fetchMyPosts(filters);
+        setData(response.result as unknown as RawPost[]);
       } catch (err) {
         console.error("Error fetching history:", err);
       } finally {
         setLoading(false);
       }
     };
-
     loadHistory();
   }, [activeFilter, sortOrder]);
 
-  // Gán type cho từng item
   const historyItems: HistoryItem[] = data.map((post) => ({
     ...post,
     type:
@@ -111,30 +111,38 @@ const HistoryScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderItem = ({ item }: { item: HistoryItem }) => (
-    <TouchableOpacity
-      onPress={() => router.push(`/forum/${item.id}`)}
-      style={styles.card}
-    >
-      {item.imageLink && (
-        <Image source={{ uri: item.imageLink }} style={styles.thumbnail} />
-      )}
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle}>{item.title}</Text>
-        <Text numberOfLines={2} style={styles.cardBody}>
-          {item.body}
-        </Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.cardTime}>
-            {new Date(item.createdAt).toLocaleDateString()}
+  const renderItem = ({ item }: { item: HistoryItem }) => {
+    const post = item; // RawPost
+    return (
+      <TouchableOpacity
+        onPress={() => router.push(`/forum/${post.id}`)}
+        style={styles.card}
+      >
+        {post.imageLink && (
+          <Image source={{ uri: post.imageLink }} style={styles.thumbnail} />
+        )}
+        <View style={styles.cardContent}>
+          <Text numberOfLines={2} style={styles.cardBody}>
+            {post.body}
           </Text>
+          <View style={styles.cardFooter}>
+            <Text style={styles.cardTime}>
+              {new Date(post.createdAt).toLocaleDateString()}
+            </Text>
+            <View style={styles.stats}>
+              <AntDesign name="like2" size={14} color="#757575" />
+              <Text style={styles.statText}>{post.totalLike ?? 0}</Text>
+              <SimpleLineIcons name="bubble" size={14} color="#757575" />
+              <Text style={styles.statText}>{post.totalComment ?? 0}</Text>
+            </View>
+          </View>
         </View>
-      </View>
-      <TouchableOpacity style={styles.moreBtn}>
-        <SimpleLineIcons name="options-vertical" size={20} color="#2E7D32" />
+        <TouchableOpacity style={styles.moreBtn}>
+          <SimpleLineIcons name="options-vertical" size={20} color="#2E7D32" />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -149,6 +157,11 @@ const HistoryScreen = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: 20 }}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No items found</Text>
+            </View>
+          }
         />
       )}
     </SafeAreaView>
@@ -156,7 +169,7 @@ const HistoryScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F8E9", paddingHorizontal: 4 },
+  container: { flex: 1, backgroundColor: "#F1F8E9", paddingHorizontal: 8 },
   filterContainer: { flexDirection: "row", marginBottom: 12, marginTop: 8 },
   filterBtn: {
     paddingVertical: 6,
@@ -172,6 +185,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 16,
+    paddingHorizontal: 4,
   },
   sortOption: {
     flexDirection: "row",
@@ -189,7 +203,6 @@ const styles = StyleSheet.create({
   },
   thumbnail: { width: 80, height: 80 },
   cardContent: { flex: 1, padding: 8, justifyContent: "space-between" },
-  cardTitle: { fontSize: 16, fontWeight: "600", color: "#2E7D32" },
   cardBody: { fontSize: 14, color: "#424242", marginTop: 4 },
   cardFooter: {
     flexDirection: "row",
@@ -199,8 +212,15 @@ const styles = StyleSheet.create({
   },
   cardTime: { fontSize: 12, color: "#757575" },
   stats: { flexDirection: "row", alignItems: "center" },
-  statText: { marginLeft: 4, fontSize: 12, color: "#757575" },
+  statText: { marginLeft: 4, marginRight: 12, fontSize: 12, color: "#757575" },
   moreBtn: { padding: 8, justifyContent: "center" },
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 40,
+  },
+  emptyText: { color: "#757575", fontSize: 16 },
 });
 
 export default HistoryScreen;

@@ -9,6 +9,8 @@ export const images = {
   scan: require("../assets/images/sprout.png"),
   chart: require("../assets/images/graph.png"),
   update: require("../assets/images/wheelbarrow.png"),
+  progress: require("../assets/images/progress.png"),
+  status: require("../assets/images/status.png"),
 };
 
 export const crops = {

@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import { useLocalSearchParams } from "expo-router";
 import {
   FlatList,
@@ -13,10 +19,13 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ImageBackground,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+
 import { Avatar } from "react-native-paper";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Menu, Divider } from "react-native-paper";
+import { Ionicons, AntDesign } from "@expo/vector-icons";
 import { sendChatQuery, ChatRequest, ChatResponse } from "@/api/aiChatApi";
 import { uploadFile, UploadFileResponse } from "@/api/fileImageApi";
 import { getChatLogsBySessionId, ChatLogResponse } from "@/api/logApi";
@@ -24,14 +33,43 @@ import { createChatSession, updateChatSession } from "@/api/sessionApi";
 import useCustomFonts from "../../hook/FontLoader";
 import Header from "@/components/Header";
 import { useAppSelector } from "../../store/hooks";
-
+import GardenPickerModal from "@/components/GardenPickerModal";
+import {
+  fetchGardenCells,
+  GardenCell,
+  GetGardenCellsResult,
+} from "@/api/gardenCellApi";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 interface Message {
   id: string;
   text: string;
   sender: "me" | "other";
   timestamp: string;
 }
-
+export interface Cell {
+  id: string;
+  rowIndex: number;
+  colIndex: number;
+  plantVariety: {
+    id: string;
+    name: string;
+  };
+  quantity: number;
+  stageGrow: string;
+  healthStatus: string;
+}
+export interface ProcessedVariety {
+  varietyId: string;
+  varietyName: string;
+  totalQuantity: number;
+  cells: Array<{
+    cellId: string;
+    row: number;
+    col: number;
+    stage: string;
+    status: string;
+  }>;
+}
 const ChatRoomScreen: React.FC = () => {
   const { roomId: paramRoomId, chatTitle } = useLocalSearchParams<{
     roomId?: string;
@@ -51,7 +89,18 @@ const ChatRoomScreen: React.FC = () => {
     paramRoomId && paramRoomId !== "new" ? paramRoomId : null
   );
   const [hasUpdatedTitle, setHasUpdatedTitle] = useState<boolean>(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const openMenu = () => setMenuVisible(true);
+  const closeMenu = () => setMenuVisible(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [gardenName, setGardenName] = useState<string>("");
+  const [gardenId, setGardenId] = useState<string>("");
 
+  const onPickGarden = (id: string, name: string) => {
+    setGardenId(id);
+    setGardenName(name);
+    // ... tiếp tục logic khác
+  };
   // Load history
   useEffect(() => {
     if (!sessionId) {
@@ -64,7 +113,7 @@ const ChatRoomScreen: React.FC = () => {
           sessionId
         );
 
-        const history: Message[] = result.flatMap((log) => [
+        const history: Message[] = result.reverse().flatMap((log) => [
           {
             id: `${log.id}-user`,
             text: log.userMessage,
@@ -88,10 +137,48 @@ const ChatRoomScreen: React.FC = () => {
   }, []);
 
   if (!fontsLoaded) return null;
+  function describeGardenCells(rawCells: GardenCell[]): string {
+    const map = new Map<string, ProcessedVariety>();
 
+    rawCells.forEach((c) => {
+      const vid = c.plantVariety.id;
+      if (!map.has(vid)) {
+        map.set(vid, {
+          varietyId: vid,
+          varietyName: c.plantVariety.name,
+          totalQuantity: 0,
+          cells: [],
+        });
+      }
+      const entry = map.get(vid)!;
+      entry.totalQuantity += c.quantity;
+      entry.cells.push({
+        cellId: c.id,
+        row: c.rowIndex,
+        col: c.colIndex,
+        stage: c.stageGrow,
+        status: c.healthStatus,
+      });
+    });
+
+    // Build the descriptive text
+    let description = "Garden Summary:\n";
+    for (const variety of map.values()) {
+      description += `\n🌿 Variety "${variety.varietyName}" (ID: ${variety.varietyId}):\n`;
+      description += `- Total plants: ${variety.totalQuantity}\n`;
+      description += `- Cell details:\n`;
+      variety.cells.forEach((cell, idx) => {
+        description += `   ${idx + 1}. Cell ${cell.cellId} at row ${
+          cell.row
+        }, col ${cell.col} – Stage: ${cell.stage}, Status: ${cell.status}\n`;
+      });
+    }
+
+    return description.trim();
+  }
   // 1. Cập nhật handleChat để nhận optional parameter messageText
   const handleChat = async (messageText?: string) => {
-    const text = messageText ?? inputText.trim();
+    let text = messageText ?? inputText.trim();
     setInputText("");
     if (!text) return;
     setLoading(true);
@@ -113,7 +200,17 @@ const ChatRoomScreen: React.FC = () => {
       // nếu gọi qua input thì mới clear inputText
       if (!messageText) setInputText("");
       setIsBotTyping(true);
+      if (gardenId) {
+        const data = await fetchGardenCells({ gardenId });
 
+        const rawCells = data.result.cells ?? [];
+        const summary: string = describeGardenCells(rawCells);
+        const dataGardenString: string = `data_garden : ${JSON.stringify(
+          summary
+        )}`;
+        text = `${dataGardenString} question :${text}`;
+        console.log("Processed garden data:", text);
+      }
       const payload: ChatRequest = {
         query: text,
         session_id: sid,
@@ -146,6 +243,8 @@ const ChatRoomScreen: React.FC = () => {
     } catch (error) {
       console.error("Chat handling error:", error);
     } finally {
+      setGardenName("");
+      setGardenId("");
       setLoading(false);
     }
   };
@@ -198,133 +297,198 @@ const ChatRoomScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header title={chatTitleCurrent} showBack />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.flex}
-        keyboardVerticalOffset={5}
-      >
-        {initialLoading ? (
-          <View style={[styles.flex, styles.centered]}>
-            <ActivityIndicator size="large" />
-          </View>
-        ) : (
-          <>
-            <FlatList
-              data={messages}
-              style={styles.flex}
-              contentContainerStyle={styles.messageList}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => {
-                // simple regex to test for common image extensions
-                const isImageUrl = /\.(jpeg|jpg|gif|png|webp)$/i.test(
-                  item.text
-                );
+    <ImageBackground
+      source={require("../../assets/images/backgournd.png")}
+      className="flex-1 overflow-visible"
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.container}>
+        <Header title={chatTitleCurrent} showBack />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.flex}
+          keyboardVerticalOffset={5}
+        >
+          {/* Show loading indicator if initial loading */}
+          {initialLoading ? (
+            <View style={[styles.flex, styles.centered]}>
+              <ActivityIndicator size="large" />
+              <Text style={{ marginTop: 10, color: "#555" }}>
+                Loading chat history...
+              </Text>
+            </View>
+          ) : (
+            <>
+              <FlatList
+                data={messages}
+                style={styles.flex}
+                contentContainerStyle={styles.messageList}
+                ListEmptyComponent={() => (
+                  <View style={styles.introContainer}>
+                    <Text style={styles.introTitle}>Welcome to Chat Room</Text>
+                    <Text style={styles.introText}>
+                      Start chatting with the bot!
+                    </Text>
+                  </View>
+                )}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => {
+                  // simple regex to test for common image extensions
+                  const isImageUrl = /\.(jpeg|jpg|gif|png|webp)$/i.test(
+                    item.text
+                  );
 
-                return (
-                  <View
-                    style={[
-                      styles.messageRow,
-                      {
-                        alignSelf:
-                          item.sender === "me" ? "flex-end" : "flex-start",
-                      },
-                    ]}
-                  >
-                    <Avatar.Image
-                      size={32}
-                      style={styles.avatar}
-                      source={
-                        item.sender === "me"
-                          ? {
-                              uri:
-                                user?.avatar_link ||
-                                "https://ui-avatars.com/api/?name=User&background=random",
-                            }
-                          : require("../../assets/images/chat_logo.png")
-                      }
-                    />
-
+                  return (
                     <View
                       style={[
-                        styles.messageBubble,
-                        item.sender === "me"
-                          ? styles.bubbleMe
-                          : styles.bubbleOther,
+                        styles.messageRow,
+                        {
+                          alignSelf:
+                            item.sender === "me" ? "flex-end" : "flex-start",
+                        },
                       ]}
                     >
-                      {isImageUrl ? (
-                        <Image
-                          source={{ uri: item.text }}
-                          style={{
-                            width: 200,
-                            height: 200,
-                            borderRadius: 12,
-                            resizeMode: "cover",
-                          }}
-                        />
-                      ) : (
-                        <Text
-                          style={
-                            item.sender === "me"
-                              ? styles.textMe
-                              : styles.textOther
-                          }
-                        >
-                          {item.text}
-                        </Text>
-                      )}
+                      <Avatar.Image
+                        size={32}
+                        style={styles.avatar}
+                        source={
+                          item.sender === "me"
+                            ? {
+                                uri:
+                                  user?.avatar_link ||
+                                  "https://ui-avatars.com/api/?name=User&background=random",
+                              }
+                            : require("../../assets/images/chat_logo.png")
+                        }
+                      />
+
+                      <View
+                        style={[
+                          styles.messageBubble,
+                          item.sender === "me"
+                            ? styles.bubbleMe
+                            : styles.bubbleOther,
+                        ]}
+                      >
+                        {isImageUrl ? (
+                          <Image
+                            source={{ uri: item.text }}
+                            style={{
+                              width: 200,
+                              height: 200,
+                              borderRadius: 12,
+                              resizeMode: "cover",
+                            }}
+                          />
+                        ) : (
+                          <Text
+                            style={
+                              item.sender === "me"
+                                ? styles.textMe
+                                : styles.textOther
+                            }
+                          >
+                            {item.text}
+                          </Text>
+                        )}
+                      </View>
                     </View>
+                  );
+                }}
+              />
+              {isBotTyping && (
+                <View style={styles.typingContainer}>
+                  <Avatar.Image
+                    size={32}
+                    style={styles.avatar}
+                    source={require("../../assets/images/chat_logo.png")}
+                  />
+                  <View style={[styles.messageBubble, styles.bubbleOther]}>
+                    <ActivityIndicator size="small" />
                   </View>
-                );
-              }}
-            />
-            {isBotTyping && (
-              <View style={styles.typingContainer}>
-                <Avatar.Image
-                  size={32}
-                  style={styles.avatar}
-                  source={require("../../assets/images/chat_logo.png")}
-                />
-                <View style={[styles.messageBubble, styles.bubbleOther]}>
-                  <ActivityIndicator size="small" />
                 </View>
+              )}
+            </>
+          )}
+          <GardenPickerModal
+            visible={modalVisible}
+            onDismiss={() => setModalVisible(false)}
+            onConfirm={onPickGarden}
+          />
+
+          <View style={styles.inputContainer}>
+            {gardenName && (
+              <View className="bg-white absolute bottom-safe-offset-7 p-2 flex-row border-slate-600 rounded-lg">
+                <Text>{gardenName}</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setGardenName("");
+                    setGardenId("");
+                  }}
+                >
+                  <Ionicons name="close" size={20} color="gray" />
+                </TouchableOpacity>
               </View>
             )}
-          </>
-        )}
-
-        <View style={styles.inputContainer}>
-          <TouchableOpacity onPress={pickAndUploadImage} disabled={loading}>
-            <Ionicons name="image-outline" size={24} />
-          </TouchableOpacity>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Write a message"
-              placeholderTextColor="#999"
-              value={inputText}
-              onChangeText={setInputText}
-            />
-            <TouchableOpacity
-              onPress={() => handleChat(inputText)}
-              disabled={loading}
+            <Menu
+              visible={menuVisible}
+              onDismiss={closeMenu}
+              anchor={
+                <TouchableOpacity onPress={openMenu} style={styles.menuBtn}>
+                  <AntDesign name="plus" size={24} color="#000" />
+                </TouchableOpacity>
+              }
             >
-              <Ionicons name="send-outline" size={24} />
-            </TouchableOpacity>
+              <Menu.Item
+                onPress={() => setModalVisible(true)}
+                title="Garden"
+                leadingIcon="file-outline"
+              />
+              <Divider />
+              <Menu.Item
+                leadingIcon="image-multiple"
+                title="Library"
+                onPress={pickAndUploadImage}
+              />
+              <Divider />
+              <Menu.Item leadingIcon="camera-outline" title="Camera" />
+            </Menu>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Write a message"
+                placeholderTextColor="#999"
+                value={inputText}
+                onChangeText={setInputText}
+              />
+              {loading ? (
+                <>
+                  <MaterialIcons
+                    name="generating-tokens"
+                    size={24}
+                    color="black"
+                  />
+                </>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => handleChat(inputText)}
+                  disabled={loading}
+                >
+                  <Ionicons name="send-outline" size={24} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          <Ionicons name="mic" size={24} />
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
 export default ChatRoomScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   flex: { flex: 1 },
   centered: { justifyContent: "center", alignItems: "center" },
   introContainer: {
@@ -333,12 +497,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
-  introTitle: { fontSize: 24, fontWeight: "bold", marginBottom: 12 },
+  introTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 12,
+    color: "gray",
+  },
   introText: {
     fontSize: 16,
     textAlign: "center",
     marginBottom: 8,
-    color: "#555",
+    color: "gray",
   },
   messageList: { flexGrow: 1, justifyContent: "flex-end", padding: 12 },
   messageRow: {
@@ -374,7 +543,8 @@ const styles = StyleSheet.create({
     margin: 8,
     padding: 8,
     borderTopWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "white",
+    position: "relative",
   },
   inputWrapper: {
     flexDirection: "row",
@@ -387,4 +557,23 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   textInput: { flex: 1, fontSize: 16 },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#ccc",
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginVertical: 12,
+  },
+  menuBtn: {},
+  optionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+  },
 });

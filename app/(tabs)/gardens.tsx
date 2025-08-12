@@ -10,6 +10,8 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  ImageBackground,
+  Image,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
@@ -22,6 +24,7 @@ import {
 import { useAppSelector } from "../../store/hooks";
 import Entypo from "@expo/vector-icons/Entypo";
 import GardenOptionsModal from "@/components/GardenOptionsModal";
+import { images } from "../../data/image";
 const GardenListScreen = () => {
   const router = useRouter();
   const [gardens, setGardens] = useState<GardenSummary[]>([]);
@@ -38,11 +41,9 @@ const GardenListScreen = () => {
     try {
       const load = async () => {
         setLoading(true);
-        const params: ListGardensParams = {
-          userId: user?.id,
-        };
+
         try {
-          const data = await fetchGardens(params);
+          const data = await fetchGardens();
 
           setGardens(data.result);
         } catch (err: any) {
@@ -76,7 +77,7 @@ const GardenListScreen = () => {
         userId: user?.id,
       };
       try {
-        const data = await fetchGardens(params);
+        const data = await fetchGardens();
 
         setGardens(data.result);
       } catch (err: any) {
@@ -124,9 +125,9 @@ const GardenListScreen = () => {
               Size: {item.rowLength}×{item.colLength}
             </Text>
             {/* condition with dynamic color */}
-            <Text style={[styles.subtitle, { color: conditionColor }]}>
-              Condition: {item.gardenCondition}
-            </Text>
+            <View className="flex-row gap-2">
+              <Text>Soil: {item.soil.replace(/_/g, " ")}</Text>
+            </View>
           </View>
         </View>
         <TouchableOpacity
@@ -143,73 +144,95 @@ const GardenListScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
-        title="Gardens"
-        showBack={false}
-        rightElement={
-          <TouchableOpacity onPress={() => router.push("/garden/create")}>
-            <AntDesign name="plus" size={26} color="black" />
-          </TouchableOpacity>
-        }
-      />
+    <ImageBackground
+      source={require("../../assets/images/backgournd.png")}
+      className="flex-1"
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.container}>
+        <Header
+          title="Gardens"
+          showBack={false}
+          rightElement={
+            <TouchableOpacity onPress={() => router.push("/garden/create")}>
+              <AntDesign
+                name="plus"
+                size={30}
+                color="black"
+                style={{ fontWeight: "bold" }}
+              />
+            </TouchableOpacity>
+          }
+        />
 
-      <View style={styles.toolbar}>
-        <TextInput
-          placeholder="Search gardens..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          style={styles.searchInput}
-        />
-        {searchQuery && (
+        <View style={styles.toolbar}>
+          <TextInput
+            placeholder="Search gardens..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={styles.searchInput}
+          />
           <TouchableOpacity
-            className=" absolute right-9 top-2"
-            onPress={() => setSearchQuery("")}
+            className="m-2 bg-white p-2 rounded-full"
+            onPress={() => router.push("/inventory")}
           >
-            <MaterialIcons name="cancel" size={20} color="gray" />
+            <Image
+              source={images.warehouse}
+              style={{ width: 24, height: 24 }}
+            />
           </TouchableOpacity>
-        )}
-      </View>
-      <GardenOptionsModal
-        visible={modalVisible}
-        onDismiss={() => setModalVisible(false)}
-        gardenId={currentGarden?.id || ""}
-        gardenName={currentGarden?.name || ""}
-        onRename={async (newName) => {
-          // call your rename API
-          await onRefresh();
-        }}
-        onDeleted={() => {
-          // remove the garden from state
-          onRefresh();
-        }}
-      />
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 20 }} size="large" />
-      ) : (
-        <FlatList
-          data={filteredGardens}
-          keyExtractor={(item) => item.name}
-          renderItem={renderGarden}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          className="shadow-sm shadow-slate-500"
-          refreshing={refreshing}
-          onRefresh={onRefresh}
+          {searchQuery && (
+            <TouchableOpacity
+              className=" absolute right-9 top-2"
+              onPress={() => setSearchQuery("")}
+            >
+              <MaterialIcons name="cancel" size={20} color="gray" />
+            </TouchableOpacity>
+          )}
+        </View>
+        <GardenOptionsModal
+          visible={modalVisible}
+          onDismiss={() => setModalVisible(false)}
+          gardenId={currentGarden?.id || ""}
+          gardenName={currentGarden?.name || ""}
+          gardenSoil={currentGarden?.soil || ""}
+          onRename={async (newName) => {
+            // call your rename API
+            await onRefresh();
+          }}
+          onDeleted={() => {
+            // remove the garden from state
+            onRefresh();
+          }}
         />
-      )}
-    </SafeAreaView>
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 20 }} size="large" />
+        ) : (
+          <FlatList
+            data={filteredGardens}
+            keyExtractor={(item) => item.name}
+            renderItem={renderGarden}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            className="shadow-sm shadow-slate-500"
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        )}
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
 export default GardenListScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "white" },
+  container: { flex: 1 },
   toolbar: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     marginVertical: 8,
+    justifyContent: "space-between",
   },
   searchInput: {
     flex: 1,
@@ -217,6 +240,7 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 8,
     borderRadius: 8,
+    backgroundColor: "#fff",
     marginRight: 8,
   },
 

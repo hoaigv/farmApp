@@ -11,7 +11,9 @@ import {
   ActivityIndicator,
   Platform,
   RefreshControl,
+  ImageBackground,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import useCustomFonts from "../../hook/FontLoader";
 import { getMyChatSessions, ChatbotSession } from "../../api/sessionApi";
 
@@ -36,14 +38,22 @@ const ChatItem = ({
   session: ChatbotSession;
   onPress: () => void;
 }) => (
-  <TouchableOpacity style={styles.chatItem} onPress={onPress}>
+  <TouchableOpacity
+    style={styles.chatItem}
+    className="border border-gray-200 shadow-sm "
+    onPress={onPress}
+  >
     <Ionicons
       name="chatbubble-outline"
       size={20}
       color="#555"
       style={{ marginRight: 10 }}
     />
-    <Text style={styles.chatText}>{session.chatTitle}</Text>
+    <Text style={styles.chatText}>
+      {session.chatTitle.length > 25
+        ? session.chatTitle.substring(0, 25) + "..."
+        : session.chatTitle}
+    </Text>
   </TouchableOpacity>
 );
 
@@ -66,15 +76,12 @@ const ChatScreen = () => {
     }
   }, []);
 
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadSessions();
-    setRefreshing(false);
-  }, [loadSessions]);
+  // Reload every time screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadSessions();
+    }, [loadSessions])
+  );
 
   if (!fontsLoaded) return null;
 
@@ -93,91 +100,98 @@ const ChatScreen = () => {
   const recent = sortedByDate.slice(0, 3);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerLabel}>Garden AI Assistant</Text>
-      </View>
+    <ImageBackground
+      source={require("../../assets/images/backgournd.png")}
+      className="flex-1"
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerLabel}>Garden AI Assistant</Text>
+        </View>
 
-      <View style={styles.newChatWrapper}>
-        <TouchableOpacity style={styles.newChatBtn} onPress={goNewChat}>
-          <Text style={styles.newChatText}>Start New Chat</Text>
-          <Ionicons name="add-circle-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.newChatWrapper}>
+          <TouchableOpacity style={styles.newChatBtn} onPress={goNewChat}>
+            <Text style={styles.newChatText}>Start New Chat</Text>
+            <Ionicons name="add-circle-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
 
-      {loading && !refreshing ? (
-        <ActivityIndicator style={{ marginTop: 20 }} />
-      ) : (
-        <FlatList
-          data={recent}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ChatItem
-              session={item}
-              onPress={() => openChat(item.id, item.chatTitle)}
-            />
-          )}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListFooterComponent={() => (
-            <>
-              <TouchableOpacity onPress={goHistory} style={styles.seeAllBtn}>
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
+        {loading && !refreshing ? (
+          <ActivityIndicator style={{ marginTop: 20 }} />
+        ) : (
+          <FlatList
+            data={recent}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ChatItem
+                session={item}
+                onPress={() => openChat(item.id, item.chatTitle)}
+              />
+            )}
+            contentContainerStyle={styles.listContent}
+            ListFooterComponent={() => (
+              <>
+                <TouchableOpacity onPress={goHistory} style={styles.seeAllBtn}>
+                  <Text style={styles.seeAllText}>See All</Text>
+                </TouchableOpacity>
 
-              {/* Inline features grid inside FlatList footer to avoid extra spacing */}
-              <View style={styles.featuresContainer}>
-                <FeatureCard
-                  icon={
-                    <Ionicons name="leaf-outline" size={24} color="#2E7D32" />
-                  }
-                  title="Soil Analysis"
-                  description="Get recommendations to enrich soil health"
-                  bgColor="#E0F8EC"
-                />
-                <FeatureCard
-                  icon={
-                    <MaterialCommunityIcons
-                      name="bug-check-outline"
-                      size={24}
-                      color="#D84315"
-                    />
-                  }
-                  title="Pest Diagnosis"
-                  description="Identify and treat pests organically"
-                  bgColor="#FFF0E5"
-                />
-                <FeatureCard
-                  icon={
-                    <Ionicons name="cloud-outline" size={24} color="#1565C0" />
-                  }
-                  title="Weather Forecast"
-                  description="Plan farm activities with detailed weather"
-                  bgColor="#EAF3FB"
-                />
-                <FeatureCard
-                  icon={
-                    <Ionicons name="bulb-outline" size={24} color="#558B2F" />
-                  }
-                  title="Planting Tips"
-                  description="Seasonal advice for crop success"
-                  bgColor="#F1F8E9"
-                />
-              </View>
-            </>
-          )}
-        />
-      )}
-    </SafeAreaView>
+                {/* Inline features grid inside FlatList footer to avoid extra spacing */}
+                <View style={styles.featuresContainer}>
+                  <FeatureCard
+                    icon={
+                      <Ionicons name="leaf-outline" size={24} color="#2E7D32" />
+                    }
+                    title="Take Care of Your Plants"
+                    description="Get recommendations for plant care"
+                    bgColor="#E0F8EC"
+                  />
+                  <FeatureCard
+                    icon={
+                      <MaterialCommunityIcons
+                        name="bug-check-outline"
+                        size={24}
+                        color="#D84315"
+                      />
+                    }
+                    title="Pest Diagnosis"
+                    description="Identify and treat pests organically"
+                    bgColor="#FFF0E5"
+                  />
+                  <FeatureCard
+                    icon={
+                      <Ionicons
+                        name="cloud-outline"
+                        size={24}
+                        color="#1565C0"
+                      />
+                    }
+                    title="Weather Forecast"
+                    description="Plan farm activities with detailed weather"
+                    bgColor="#EAF3FB"
+                  />
+                  <FeatureCard
+                    icon={
+                      <Ionicons name="bulb-outline" size={24} color="#558B2F" />
+                    }
+                    title="Planting Tips"
+                    description="Seasonal advice for crop success"
+                    bgColor="#F1F8E9"
+                  />
+                </View>
+              </>
+            )}
+          />
+        )}
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
 export default ChatScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   header: { alignItems: "center", paddingVertical: 16 },
   headerLabel: { fontSize: 22, fontFamily: "PoetsenOne-Regular" },
   newChatWrapper: { marginHorizontal: 16, marginBottom: 12 },
@@ -200,10 +214,19 @@ const styles = StyleSheet.create({
   },
   newChatText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   listContent: { paddingHorizontal: 16, paddingBottom: 16 },
-  chatItem: { flexDirection: "row", alignItems: "center", paddingVertical: 10 },
+  chatItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    backgroundColor: "white",
+    gap: 2,
+    margin: 2,
+    borderRadius: 8,
+    padding: 12,
+  },
   chatText: { fontSize: 15, color: "#333" },
   seeAllBtn: { paddingVertical: 10, alignItems: "center" },
-  seeAllText: { fontSize: 14, color: "#007AFF" },
+  seeAllText: { fontSize: 14, color: "black", fontWeight: "600" },
   featuresContainer: {
     flexWrap: "wrap",
     flexDirection: "row",

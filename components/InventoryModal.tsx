@@ -1,73 +1,130 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { View, StyleSheet, FlatList, Image } from "react-native";
 import {
-  Modal,
   Portal,
+  Modal,
   Text,
-  RadioButton,
   TextInput,
   Button,
   ActivityIndicator,
   List,
+  Snackbar,
+  IconButton,
 } from "react-native-paper";
-import { getMyPlantInventories, PlantInventory } from "@/api/plantIventoryApi";
+import {
+  getMyPlantInventories,
+  PlantInventoryEntry,
+} from "@/api/plantIventoryApi";
 import { crops } from "@/data/image";
+
 type Props = {
   visible: boolean;
   onDismiss: () => void;
-  onConfirm: (inventory: PlantInventory, quantity: number) => void;
+  onConfirm: (inventory: PlantInventoryEntry, quantity: number) => void;
 };
 
 const InventoryModal = ({ visible, onDismiss, onConfirm }: Props) => {
-  const [inventories, setInventories] = useState<PlantInventory[]>([]);
+  const [inventories, setInventories] = useState<PlantInventoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string>("");
   const [quantity, setQuantity] = useState<string>("0");
   const [error, setError] = useState<string>("");
+  const [fetchError, setFetchError] = useState<string>("");
+
+  const loadInventories = useCallback(() => {
+    setLoading(true);
+    getMyPlantInventories()
+      .then(setInventories)
+      .catch((err) => {
+        console.error(err);
+        setFetchError("Failed to load inventories");
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (visible) {
-      setLoading(true);
-      getMyPlantInventories()
-        .then((data) => setInventories(data))
-        .catch((err) => console.error(err))
-        .finally(() => setLoading(false));
+      loadInventories();
     } else {
       setSelectedId("");
       setQuantity("0");
       setError("");
+      setFetchError("");
     }
-  }, [visible]);
+  }, [visible, loadInventories]);
 
   const selectedInventory = inventories.find((inv) => inv.id === selectedId);
 
-  const validateQuantity = (value: string) => {
-    setQuantity(value);
-    setError("");
-    const num = parseInt(value, 10);
-    if (
-      selectedInventory &&
-      num > selectedInventory.perCellMax &&
-      num > 0 &&
-      num !== null
-    ) {
-      setError(`Max per cell is ${selectedInventory.perCellMax}`);
-    }
-  };
+  const validateQuantity = useCallback(
+    (value: string) => {
+      setQuantity(value);
+      setError("");
+      const num = parseInt(value, 10);
+      if (isNaN(num) || num <= 0) {
+        setError("Please enter a valid quantity");
+        return;
+      }
+      if (selectedInventory && num > selectedInventory.numberOfVariety) {
+        setError(`Max available is ${selectedInventory.numberOfVariety}`);
+      }
+    },
+    [selectedInventory]
+  );
 
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     if (!selectedInventory) return;
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) {
       setError("Please enter a valid quantity");
       return;
     }
-    if (qty > selectedInventory.perCellMax) {
-      setError(`Max per cell is ${selectedInventory.perCellMax}`);
+    if (qty > selectedInventory.numberOfVariety) {
+      setError(`Max available is ${selectedInventory.numberOfVariety}`);
       return;
     }
     onConfirm(selectedInventory, qty);
-  };
+  }, [quantity, selectedInventory, onConfirm]);
+
+  const renderHeader = () => (
+    <>
+      <Text style={styles.title}>Choose plant & quantity</Text>
+      {loading && <ActivityIndicator style={{ marginVertical: 20 }} />}
+    </>
+  );
+
+  const renderFooter = () => (
+    <>
+      {selectedInventory && (
+        <>
+          <TextInput
+            label="Quantity"
+            value={quantity}
+            keyboardType="numeric"
+            onChangeText={validateQuantity}
+            style={styles.input}
+          />
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+        </>
+      )}
+      <View style={styles.actions}>
+        <Button onPress={onDismiss}>Cancel</Button>
+        <Button
+          mode="contained"
+          disabled={!selectedInventory || !!error}
+          onPress={handleConfirm}
+        >
+          Confirm
+        </Button>
+      </View>
+      <Snackbar
+        visible={!!fetchError}
+        onDismiss={() => setFetchError("")}
+        action={{ label: "Retry", onPress: loadInventories }}
+      >
+        {fetchError}
+      </Snackbar>
+    </>
+  );
 
   return (
     <Portal>
@@ -76,63 +133,42 @@ const InventoryModal = ({ visible, onDismiss, onConfirm }: Props) => {
         onDismiss={onDismiss}
         contentContainerStyle={styles.container}
       >
-        <Text style={styles.title}>Choose plant variety & quantity</Text>
-        {loading ? (
-          <ActivityIndicator style={{ marginVertical: 20 }} />
-        ) : (
-          <FlatList
-            data={inventories}
-            keyExtractor={(item) => item.id}
-            style={styles.list}
-            renderItem={({ item }) => (
-              <List.Item
-                title={item.name}
-                description={`Left: ${item.inventoryQuantity} — Max/cell: ${item.perCellMax}`}
-                left={() => (
-                  <Image
-                    source={crops[item.icon as keyof typeof crops]} // Replace with actual image source
-                    style={styles.avatar}
-                  />
-                )}
-                right={() => (
-                  <View style={{ borderColor: "black", borderWidth: 1 }}>
-                    <RadioButton
-                      value={item.id}
-                      status={item.id === selectedId ? "checked" : "unchecked"}
-                      onPress={() => setSelectedId(item.id)}
-                    />
-                  </View>
-                )}
-              />
-            )}
-          />
-        )}
-
-        {selectedInventory && (
-          <>
-            <TextInput
-              label="Amount you want to plant"
-              value={quantity}
-              keyboardType="numeric"
-              onChangeText={validateQuantity}
-              style={styles.input}
+        {renderHeader()}
+        <FlatList
+          data={inventories}
+          keyExtractor={(item) => item.id}
+          extraData={selectedId}
+          renderItem={({ item }) => (
+            <List.Item
+              title={item.plantVariety.name}
+              description={`Available: ${item.numberOfVariety}`}
+              left={() => (
+                <Image
+                  source={
+                    crops[item.plantVariety.iconLink as keyof typeof crops] || {
+                      uri: item.plantVariety.iconLink,
+                    }
+                  }
+                  style={styles.avatar}
+                />
+              )}
+              right={() => (
+                <IconButton
+                  icon={
+                    item.id === selectedId
+                      ? "radiobox-marked"
+                      : "radiobox-blank"
+                  }
+                  onPress={() => setSelectedId(item.id)}
+                  accessibilityLabel={`Select ${item.plantVariety.name}`}
+                />
+              )}
+              onPress={() => setSelectedId(item.id)}
             />
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-          </>
-        )}
-
-        <View style={styles.actions}>
-          <Button onPress={onDismiss}>Cancel</Button>
-          <Button
-            mode="contained"
-            disabled={
-              !selectedInventory || parseInt(quantity, 10) <= 0 || !!error
-            }
-            onPress={handleConfirm}
-          >
-            Confirm
-          </Button>
-        </View>
+          )}
+          contentContainerStyle={{ flexGrow: 0 }}
+        />
+        {renderFooter()}
       </Modal>
     </Portal>
   );
@@ -144,23 +180,11 @@ const styles = StyleSheet.create({
     margin: 20,
     borderRadius: 10,
     padding: 16,
-    // remove maxHeight to allow flex
-    height: 400,
   },
   title: {
     fontWeight: "bold",
     fontSize: 18,
     marginBottom: 12,
-  },
-  list: {
-    flex: 1,
-    marginBottom: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
   },
   input: {
     marginBottom: 4,
@@ -172,6 +196,13 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    marginVertical: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
   },
 });
 

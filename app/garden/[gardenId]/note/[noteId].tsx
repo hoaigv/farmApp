@@ -18,7 +18,7 @@ import {
 import { Formik } from "formik";
 import * as Yup from "yup";
 import * as ImagePicker from "expo-image-picker";
-import DateTimePicker from "@react-native-community/datetimepicker"; // if you need date; else omit
+
 import Header from "@/components/Header";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import {

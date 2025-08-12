@@ -11,53 +11,68 @@ import {
 interface NotificationModalProps {
   visible: boolean;
   onClose: () => void;
+  onClearAll?: () => void;
+  onDeleteItem?: (id: string) => void;
 }
-
-const notifications = [
-  { id: "1", message: '🌿 Bạn đã hoàn thành "Tưới cây buổi sáng"' },
-  { id: "2", message: "☀️ Ngày mai trời nắng, nên tưới cây sớm" },
-  { id: "3", message: "🐛 Cảnh báo sâu bệnh ở cây cà chua" },
-];
 
 const NotificationModal: React.FC<NotificationModalProps> = ({
   visible,
   onClose,
+  onClearAll,
+  onDeleteItem,
 }) => {
+  // Empty list by default
+  const notifications: { id: string; message: string }[] = [];
+
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View className="flex-1 bg-black/50 justify-center ">
-        <View className="bg-white mx-4 rounded-2xl p-4">
-          <View className="relative">
-            <Text className="text-lg font-bold mb-2 text-center">
-              Thông báo
+      <View className="flex-1 bg-black/60 justify-center items-center">
+        <View className="bg-white w-11/12 max-h-3/4 rounded-2xl p-6 shadow-lg">
+          {/* Header */}
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-xl font-semibold text-gray-900">
+              Notifications
             </Text>
-            <TouchableOpacity className="absolute right-0 p-1 rounded-md shadow-sm border border-gray-500">
-              <Text>Xoá tất cả</Text>
+            <TouchableOpacity
+              onPress={onClearAll}
+              className="px-3 py-1 rounded-md border border-gray-300 bg-gray-100"
+            >
+              <Text className="text-sm text-gray-700">Clear All</Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={notifications}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View className=" flex-row items-center justify-between border-b border-gray-200 py-4">
-                <Text className="text-base text-gray-800">
-                  • {item.message}
-                </Text>
-                <TouchableOpacity>
-                  <Image
-                    source={require("../../assets/images/bin.png")}
-                    style={{ width: 24, height: 24 }}
-                  />
-                </TouchableOpacity>
-              </View>
-            )}
-          />
 
+          {/* Notification List or Empty State */}
+          {notifications.length === 0 ? (
+            <View className="py-10 items-center">
+              <Text className="text-gray-500">No notifications</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={notifications}
+              keyExtractor={(item) => item.id}
+              className="flex-grow"
+              renderItem={({ item }) => (
+                <View className="flex-row items-center justify-between border-b border-gray-200 py-3">
+                  <Text className="flex-1 text-base text-gray-800">
+                    • {item.message}
+                  </Text>
+                  <TouchableOpacity onPress={() => onDeleteItem?.(item.id)}>
+                    <Image
+                      source={require("../../assets/images/bin.png")}
+                      style={{ width: 20, height: 20 }}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          )}
+
+          {/* Close Button */}
           <TouchableOpacity
             onPress={onClose}
-            className="mt-4 bg-primary rounded-xl py-2 items-center"
+            className="mt-6 bg-blue-600 rounded-lg py-3 items-center"
           >
-            <Text className="text-white font-semibold">Đóng</Text>
+            <Text className="text-white text-base font-medium">Close</Text>
           </TouchableOpacity>
         </View>
       </View>

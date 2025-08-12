@@ -7,6 +7,7 @@ import { Provider as PaperProvider } from "react-native-paper";
 import { Provider, useSelector } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+
 import "../global.css";
 import { persistor, RootState, store } from "../store";
 
@@ -17,11 +18,9 @@ function AuthRedirectWrapper({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const inAuthGroup = segments[0] === "authentication";
-
     if (!auth.user && !inAuthGroup) {
       router.replace("/authentication/login");
     }
-
     if (auth.user && inAuthGroup) {
       router.replace("/(tabs)");
     }

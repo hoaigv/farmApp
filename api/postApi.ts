@@ -40,7 +40,20 @@ export interface ListPostsParams {
   sortBy?: string; // default: createdAt
   sortDir?: "asc" | "desc"; // default: desc
 }
-
+export interface CommunityPostResponse {
+  message: string;
+  result: {
+    id: string;
+    body: string;
+    imageLink?: string;
+    isLike?: boolean; // optional
+    totalComment: number;
+    totalLike: number;
+    userName: string;
+    userLink: string;
+    createdAt: string;
+  };
+}
 /**
  * Summary of a post in a list, matching the communityPostResponse structure.
  */
@@ -147,8 +160,12 @@ export const fetchMyPosts = async (
 /**
  * Fetch a single post by ID.
  */
-export const fetchPostById = async (id: string): Promise<GetPostResponse> => {
-  const response = await axiosInstance.get<GetPostResponse>(`/posts/${id}`);
+export const fetchPostById = async (
+  id: string
+): Promise<CommunityPostResponse> => {
+  const response = await axiosInstance.get<CommunityPostResponse>(
+    `/posts/${id}`
+  );
 
   return response.data;
 };

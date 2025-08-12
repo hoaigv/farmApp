@@ -1,5 +1,6 @@
+// GardenOptionsModal.tsx
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Alert } from "react-native";
+import { View, StyleSheet, Alert, ScrollView } from "react-native";
 import {
   Button,
   Modal,
@@ -17,44 +18,73 @@ import {
 type Props = {
   visible: boolean;
   onDismiss: () => void;
-  gardenId: string; // ID of the garden to delete
+  gardenId: string;
   gardenName: string;
-  onRename: (newName: string) => void;
-  onDeleted: () => void; // callback after successful deletion
+  gardenSoil: string;
+  onRename: (newName: string, newSoil: string) => void;
+  onDeleted: () => void;
 };
+
+const soilTypes = [
+  "SANDY_SOIL",
+  "LOAMY_SAND",
+  "LOAM",
+  "CLAY_LOAM",
+  "CLAY_SOIL",
+  "ALLUVIAL_SOIL",
+  "PEATY_SOIL",
+  "CHALKY_SOIL",
+  "ACID_SULFATE_SOIL",
+  "BASALTIC_SOIL",
+  "RED_SOIL",
+  "BLACK_SOIL",
+  "INFERTILE_SOIL",
+];
 
 const GardenOptionsModal = ({
   visible,
   onDismiss,
   gardenId,
   gardenName,
+  gardenSoil,
   onRename,
   onDeleted,
 }: Props) => {
   const [name, setName] = useState(gardenName);
+  const [soil, setSoil] = useState<string>(gardenSoil);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setName(gardenName);
-  }, [gardenName]);
+    setSoil(gardenSoil);
+  }, [gardenName, gardenSoil]);
 
   const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert("Validation Error", "Please enter a valid garden name.");
+      return;
+    }
+    if (!soil) {
+      Alert.alert("Validation Error", "Please select a soil type.");
+      return;
+    }
+
+    const data: UpdateGardenRequest = {
+      id: gardenId,
+      name: name.trim(),
+      soil,
+    };
+
     try {
-      if (!name.trim()) {
-        Alert.alert("Validation Error", "Please enter a valid garden name.");
-        return;
-      }
-      const data: UpdateGardenRequest = {
-        id: gardenId,
-        name: name.trim(),
-      };
+      setLoading(true);
       await updateGarden(data);
-      onRename(name.trim() || gardenName);
+      setLoading(false);
+      onRename(name.trim(), soil);
       onDismiss();
     } catch (error) {
-      console.error("Failed to update garden name:", error);
-      Alert.alert("Error", "Failed to update garden name.");
-      return;
+      setLoading(false);
+      console.error("Failed to update garden:", error);
+      Alert.alert("Error", "Failed to update garden.");
     }
   };
 
@@ -94,6 +124,7 @@ const GardenOptionsModal = ({
       >
         <Text style={styles.title}>Garden Options</Text>
 
+        {/* Name */}
         <Text style={styles.label}>Name</Text>
         <TextInput
           mode="outlined"
@@ -103,22 +134,54 @@ const GardenOptionsModal = ({
           editable={!loading}
         />
 
+        {/* Soil */}
+        <Text style={[styles.label, { marginTop: 8 }]}>Soil Type</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.soilContainer}
+        >
+          {soilTypes.map((type) => (
+            <Button
+              key={type}
+              mode={soil === type ? "contained" : "outlined"}
+              onPress={() => setSoil(type)}
+              disabled={loading}
+              style={styles.soilButton}
+              labelStyle={
+                soil === type ? styles.soilTextSelected : styles.soilText
+              }
+            >
+              {type
+                .toLowerCase()
+                .split("_")
+                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(" ")}
+            </Button>
+          ))}
+        </ScrollView>
+
+        {/* Save / Cancel */}
         <View style={styles.buttonRow}>
           <Button onPress={onDismiss} disabled={loading}>
             Cancel
           </Button>
-          <Button mode="contained" onPress={handleSave} disabled={loading}>
+          <Button
+            mode="contained"
+            onPress={handleSave}
+            disabled={loading}
+            loading={loading}
+          >
             Save
           </Button>
         </View>
 
         <View style={styles.divider} />
 
+        {/* Delete */}
         <Button
           mode="text"
-          onPress={() => {
-            handleDelete(gardenId);
-          }}
+          onPress={() => handleDelete(gardenId)}
           labelStyle={styles.deleteLabel}
           disabled={loading}
         >
@@ -148,15 +211,31 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 16,
   },
+  soilContainer: {
+    flexDirection: "row",
+    paddingVertical: 8,
+  },
+  soilButton: {
+    marginRight: 8,
+    borderRadius: 16,
+  },
+  soilText: {
+    fontSize: 12,
+    color: "#4CAF50",
+  },
+  soilTextSelected: {
+    fontSize: 12,
+    color: "#FFFFFF",
+  },
   buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginTop: 16,
   },
   divider: {
     height: 1,
     backgroundColor: "#eee",
-    marginVertical: 8,
+    marginVertical: 16,
   },
   deleteLabel: {
     color: "#e74c3c",

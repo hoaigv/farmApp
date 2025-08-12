@@ -99,17 +99,17 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="profile"
+        name="setting"
         options={{
-          title: "Profile",
+          title: "Setting",
           headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
             <TabBarIcon
               iconSet="AntDesign"
-              name="user"
+              name="setting"
               color={color}
               size={size}
-              label="Profile"
+              label="Setting"
               focused={focused}
             />
           ),
