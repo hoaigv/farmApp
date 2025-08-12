@@ -9,7 +9,11 @@ export default function BunkerLayout() {
         options={{ title: "Inventory", headerShown: false }}
       />
       <Stack.Screen
-        name="edit"
+        name="varieties"
+        options={{ title: "Inventory Detail", headerShown: false }}
+      />
+      <Stack.Screen
+        name="[varietyId]"
         options={{ title: "Inventory Detail", headerShown: false }}
       />
     </Stack>

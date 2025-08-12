@@ -1,6 +1,6 @@
 // --- src/api/cells.ts ---
 import axiosInstance from "./axiosInstance";
-
+import { Variety } from "./varietyApi";
 // Interface cho 1 ô (cell) của vườn
 export interface GardenCell {
   id: string;
@@ -8,8 +8,12 @@ export interface GardenCell {
   colIndex: number;
   quantity: number;
   healthStatus: "NORMAL" | "DISEASED" | "DEAD"; // hoặc các trạng thái khác backend trả về
-  plantInventoryId: string;
-  icon: string;
+  diseaseName: string | null; // tên bệnh nếu có
+  plantVariety: Variety; // thông tin giống cây trồng
+  stageLink: string; // link đến stage của giống cây trồng
+  imgCellCurrent: string;
+  stageGrow: string; // giai đoạn phát triển của giống cây trồng
+  createdAt: string; // ngày tạo ô
 }
 
 // Kết quả trả về trong trường `result`
@@ -17,7 +21,7 @@ export interface GetGardenCellsResult {
   gardenId: string;
   rowLength: number;
   colLength: number;
-  cells: GardenCell[];
+  cells?: GardenCell[];
 }
 
 // Response đầy đủ từ API
@@ -43,8 +47,6 @@ export interface GetGardenCellsResponse {
  */
 export const fetchGardenCells = async (params: {
   gardenId: string;
-  plantInventoryId?: string;
-  status?: string;
 }): Promise<GetGardenCellsResponse> => {
   const response = await axiosInstance.get<GetGardenCellsResponse>("/cells", {
     params,
@@ -55,7 +57,7 @@ export const fetchGardenCells = async (params: {
 
 // Tạo interface cho 1 ô gửi lên (không chứa id, healthStatus, plantImageUrl)
 export interface UpsertGardenCell {
-  plantInventoryId: string;
+  varietyId: string;
   rowIndex: number;
   colIndex: number;
   quantity: number;
@@ -123,15 +125,19 @@ export const deleteGardenCells = async (
  */
 export interface UpdateGardenCellRequest {
   id: string;
-  rowIndex: number;
-  colIndex: number;
-  healthStatus: "DISEASED" | "DEAD" | "NORMAL";
+  rowIndex: number | null;
+  colIndex: number | null;
+  healthStatus: "DISEASED" | "DEAD" | "NORMAL" | null;
+  diseaseName?: string | null; // tên bệnh nếu có
+  nextStage: boolean; // true nếu muốn chuyển sang giai đoạn tiếp theo
+  imgCellCurrent: string | null; // ảnh hiện tại của ô, có thể null nếu không cần cập nhật
 }
 
 /**
  * Payload gửi lên backend
  */
 export interface UpdateGardenCellsRequest {
+  gardenId: string; // ID của garden
   cells: UpdateGardenCellRequest[];
 }
 

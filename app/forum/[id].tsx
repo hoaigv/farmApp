@@ -1,189 +1,281 @@
-import Header from "@/components/Header";
-import React, { useEffect, useState } from "react";
+// PostDetailScreen.tsx
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  View,
   Text,
+  Image,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View,
+  KeyboardAvoidingView,
+  Keyboard,
+  Platform,
   SafeAreaView,
-  Image,
+  ImageBackground,
+  ActivityIndicator,
+  StyleSheet,
+  VirtualizedList,
 } from "react-native";
+import Header from "@/components/Header";
+import PostComponent, { PostType } from "@/components/PostComponent";
 import { useLocalSearchParams } from "expo-router";
-import { fetchPostById } from "@/api/postApi";
+import { useAppSelector } from "@/store/hooks";
+import { fetchPostById, CommunityPostResponse } from "@/api/postApi";
 import {
+  fetchComments,
   createComment,
   CommentResponse,
-  fetchComments,
 } from "@/api/commentApi";
-import PostComponent, { PostType } from "@/components/PostComponent";
-import { useAppSelector } from "@/store/hooks";
 
-const PostDetailScreen = () => {
+// Utility tính "time ago"
+const timeAgo = (dateString: string): string => {
+  const now = Date.now();
+  const past = new Date(dateString).getTime();
+  const diffSec = Math.floor((now - past) / 1000);
+  if (diffSec < 60) return `${diffSec} giây trước`;
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} giờ trước`;
+  if (diffSec < 2592000) return `${Math.floor(diffSec / 86400)} ngày trước`;
+  if (diffSec < 31536000) return `${Math.floor(diffSec / 2592000)} tháng trước`;
+  return `${Math.floor(diffSec / 31536000)} năm trước`;
+};
+
+type WrappedItem =
+  | { type: "header"; post: PostType }
+  | { type: "comment"; comment: CommentResponse };
+
+const PostDetailScreen: React.FC = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const currentUser = useAppSelector((s) => s.auth.user);
+
   const [post, setPost] = useState<PostType | null>(null);
+  const [comments, setComments] = useState<CommentResponse[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
-  const [listComment, setListComment] = useState<CommentResponse[]>([]);
-  const timeAgo = (dateString: string): string => {
-    const now = new Date();
-    const past = new Date(dateString);
-    const diff = Math.floor((now.getTime() - past.getTime()) / 1000); // in seconds
 
-    if (diff < 60) return `${diff} giây trước`;
-    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
-    if (diff < 2592000) return `${Math.floor(diff / 86400)} ngày trước`;
-    if (diff < 31536000) return `${Math.floor(diff / 2592000)} tháng trước`;
-    return `${Math.floor(diff / 31536000)} năm trước`;
-  };
-
+  // Load post + comment
   useEffect(() => {
-    if (id) {
-      fetchPostById(id)
-        .then(({ result }) => {
-          setPost({
-            id: result.id,
-            userAvatar:
-              "https://crowd-literature.eu/wp-content/uploads/2015/01/no-avatar.gif",
-            userName: result.userName || "Unknown",
-            createdAt: result.createdAt,
-            body: result.body,
-            imageLink: result.imageLink || null,
-            isLike: false,
-            totalLike: 0,
-            totalComment: result.commentCount,
-          });
-        })
-        .catch((error) => {
-          console.error("Error fetching post:", error);
+    if (!id) return;
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const pRes: CommunityPostResponse = await fetchPostById(id);
+        const cRes = await fetchComments(id);
+        if (!mounted) return;
+
+        setPost({
+          id: pRes.result.id,
+          userAvatar: pRes.result.userLink || "",
+          userName: pRes.result.userName || "Unknown",
+          createdAt: pRes.result.createdAt,
+          body: pRes.result.body || "",
+          imageLink:
+            pRes.result.imageLink ||
+            "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSZfYb4CWzn9zbn-jLTwei46uk0dMEgMsh3gQ&s",
+          isLike: pRes.result.isLike || false,
+          totalLike: pRes.result.totalLike || 0,
+          totalComment: cRes.result.length,
         });
-      fetchComments(id as string)
-        .then(({ result }) => {
-          setListComment(
-            result.map((c) => ({
-              id: c.id,
-              postId: c.postId,
-              userName: c.userName || "Anonymous",
-              userLink: c.userLink || "",
-              content: c.content,
-              createdAt: c.createdAt,
-            }))
+
+        const formattedComments = cRes.result
+          .map((c) => ({
+            ...c,
+            userName: c.userName || "Anonymous",
+            userLink: c.userLink || "",
+          }))
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
-        })
-        .catch((error) => {
-          console.error("Error fetching comments:", error);
-        });
-    }
+        setComments(formattedComments);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, [id]);
 
-  const handleAddComment = async () => {
-    const trimmed = newComment.trim();
-    if (trimmed) {
-      const response = await createComment({
-        postId: id as string,
-        content: trimmed,
+  // Thêm comment mới
+  const handleAddComment = useCallback(async () => {
+    if (!post || !newComment.trim()) return;
+    try {
+      const resp = await createComment({
+        postId: post.id,
+        content: newComment.trim(),
       });
-      const newCommentResponse: CommentResponse = {
-        id: response.id,
-        postId: id as string,
-        userName: currentUser?.name || "Anonymous",
-        userLink: currentUser?.avatar_link || "",
-        content: trimmed,
-        createdAt: new Date().toISOString(),
-      };
-      setListComment((prev) => [...prev, newCommentResponse]);
-      // sẽ bổ sung khi triển khai comment
+
+      setComments((prev) => [
+        {
+          ...resp,
+          content: newComment.trim(),
+          userName: currentUser?.name || "Anonymous",
+          userLink: currentUser?.avatar_link || "",
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+
       setNewComment("");
+    } catch (err) {
+      console.error(err);
+    }
+  }, [newComment, post, currentUser]);
+
+  // VirtualizedList helpers
+  const getItemCount = (data: CommentResponse[]) =>
+    post ? data.length + 1 : 0;
+
+  const getItem = (data: CommentResponse[], index: number): WrappedItem => {
+    if (index === 0) {
+      return { type: "header", post: post! };
+    }
+    return { type: "comment", comment: data[index - 1] };
+  };
+
+  // Render từng item (header hoặc comment)
+  const renderItem = ({ item }: { item: WrappedItem }) => {
+    if (item.type === "header") {
+      return (
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.headerContainer}>
+            <PostComponent
+              post={item.post}
+              onComment={() => {}}
+              onImagePress={() => {}}
+              isDetail
+            />
+          </View>
+        </TouchableWithoutFeedback>
+      );
+    } else {
+      const c = item.comment;
+      return (
+        <View style={styles.commentContainer}>
+          <Image
+            source={{
+              uri: c.userLink || "https://ui-avatars.com/api/?name=Anonymous",
+            }}
+            style={styles.avatarSmall}
+          />
+          <View style={styles.commentTextWrapper}>
+            <Text style={styles.commentAuthor}>{c.userName}</Text>
+            <Text style={styles.commentContent}>{c.content}</Text>
+            <Text style={styles.commentTime}>{timeAgo(c.createdAt)}</Text>
+          </View>
+        </View>
+      );
     }
   };
 
-  if (!post) {
+  if (loading) {
     return (
-      <SafeAreaView className="flex-1 justify-center items-center bg-white">
-        <Text className="text-base text-gray-500">Loading post...</Text>
+      <SafeAreaView style={styles.loaderContainer}>
+        <ActivityIndicator size="large" />
+        <Text>Loading post...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <Header title="Post Details" />
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View className="flex-1 px-4 pt-4">
-            <PostComponent
-              post={post}
-              onComment={() => {}}
-              onImagePress={(uri) => {}}
+    <ImageBackground
+      source={require("../../assets/images/backgournd.png")}
+      style={styles.background}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.flex1}>
+        <Header title="Post Details" />
+        <KeyboardAvoidingView
+          style={styles.flex1}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <VirtualizedList<WrappedItem>
+            data={comments}
+            initialNumToRender={10}
+            getItemCount={getItemCount}
+            getItem={getItem}
+            keyExtractor={(item, index) =>
+              item.type === "header"
+                ? "post-header"
+                : item.comment.id + "-" + index
+            }
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+          />
+
+          {/* Input thêm comment */}
+          <View style={styles.commentInputContainer}>
+            <Image
+              source={{
+                uri:
+                  currentUser?.avatar_link ||
+                  "https://ui-avatars.com/api/?name=You",
+              }}
+              style={styles.avatarSmall}
             />
-
-            {/* Hiding comments until ready */}
-            {/* <Text className="text-base font-semibold mb-2">Comments</Text>
-            ... */}
-            <ScrollView
-              className="flex-1"
-              contentContainerStyle={{ paddingBottom: 20 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {listComment.map((comment) => (
-                <View key={comment.id} className="flex-row items-start mb-4">
-                  <Image
-                    source={{
-                      uri:
-                        comment.userLink ||
-                        "https://ui-avatars.com/api/?name=Anonymous",
-                    }}
-                    style={styles.avatarSmall}
-                  />
-                  <View className="ml-2 flex-1">
-                    <Text className="font-semibold">{comment.userName}</Text>
-                    <Text className="text-gray-700">{comment.content}</Text>
-                    <Text className="text-xs text-gray-500">
-                      {timeAgo(comment.createdAt)}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-
-            <View className="flex-row items-center border border-gray-300 rounded-full px-4 py-2 mx-4 mb-4 bg-white">
-              <Image
-                source={{
-                  uri:
-                    currentUser?.avatar_link ||
-                    "https://ui-avatars.com/api/?name=You",
-                }}
-                style={styles.avatarSmall}
-              />
-              <TextInput
-                className="flex-1 ml-2"
-                placeholder="Write a comment..."
-                value={newComment}
-                onChangeText={setNewComment}
-                onSubmitEditing={handleAddComment}
-                returnKeyType="send"
-              />
-              <TouchableOpacity onPress={handleAddComment}>
-                <Text className="text-blue-600 font-medium ml-2">Send</Text>
-              </TouchableOpacity>
-            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Write a comment..."
+              value={newComment}
+              onChangeText={setNewComment}
+              onSubmitEditing={handleAddComment}
+              returnKeyType="send"
+            />
+            <TouchableOpacity onPress={handleAddComment}>
+              <Text style={styles.sendText}>Send</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
-export default PostDetailScreen;
+export default React.memo(PostDetailScreen);
 
-const styles = {
+const styles = StyleSheet.create({
+  flex1: { flex: 1 },
+  background: { flex: 1 },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerContainer: { padding: 16 },
+  listContent: { paddingBottom: 80 },
+  commentContainer: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 12,
+    borderRadius: 8,
+  },
   avatarSmall: { width: 32, height: 32, borderRadius: 16 },
-};
+  commentTextWrapper: { marginLeft: 8, flex: 1 },
+  commentAuthor: { fontWeight: "600" },
+  commentContent: { marginTop: 4 },
+  commentTime: { marginTop: 4, fontSize: 12, color: "#888" },
+  commentInputContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderColor: "black",
+    marginHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  input: { flex: 1, marginHorizontal: 8, paddingVertical: 8 },
+  sendText: { color: "#007AFF", fontWeight: "600" },
+});

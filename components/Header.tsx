@@ -41,8 +41,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
   },
   backIcon: {
     position: "absolute",

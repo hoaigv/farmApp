@@ -25,7 +25,7 @@ export const loginWithEmail = async (
   credentials: LoginCredentials
 ): Promise<LoginResponse> => {
   const response = await axiosInstance.post<LoginResponse>(
-    "/auth/login",
+    "/auth/email",
     credentials
   );
   return response.data;

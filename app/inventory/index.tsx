@@ -11,19 +11,16 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import Header from "@/components/Header";
 import { useRouter } from "expo-router";
 import {
   getMyPlantInventories,
-  PlantInventory,
-  deletePlantInventories,
-} from "@/api/plantIventoryApi";
-import {
-  showError,
-  showSuccess,
-  showWarning,
-} from "@/utils/flashMessageService";
+  PlantInventoryEntry,
+} from "../../api/plantIventoryApi";
+import { useFocusEffect } from "@react-navigation/native";
+import { showError } from "@/utils/flashMessageService";
+
 const { width } = Dimensions.get("window");
 
 const BunkerScreen: React.FC = () => {
@@ -32,33 +29,41 @@ const BunkerScreen: React.FC = () => {
   const cols = 5;
   const maxCells = rows * cols;
 
-  // grid holds one “icon” per cell (here we’ll use the inventory.name)
-  const [grid, setGrid] = useState<Array<PlantInventory | null>>(
+  // grid holds one PlantInventoryEntry per cell (or null)
+  const [grid, setGrid] = useState<Array<PlantInventoryEntry | null>>(
     Array(maxCells).fill(null)
   );
-  const [action, setAction] = useState<"remove" | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
 
-  useEffect(() => {
-    const loadInventories = async () => {
-      try {
-        const inventories: PlantInventory[] = await getMyPlantInventories(); // 2️⃣
-        // Map each inventory to its name, then pad with nulls
-        // const icons = inventories.map((inv) => inv.imageUrl);
-        const icons = inventories;
-        setGrid([...icons, ...Array(maxCells - icons.length).fill(null)]);
-      } catch (err) {
-        Alert.alert("Error", "Could not load your plant inventories.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const loadInventories = async () => {
+        try {
+          setLoading(true);
+          const inventories = await getMyPlantInventories(); // PlantInventoryEntry[]
+          if (!isActive) return;
+          setGrid([
+            ...inventories,
+            ...Array(maxCells - inventories.length).fill(null),
+          ]);
+        } catch (err) {
+          Alert.alert("Error", "Không tải được dữ liệu từ kho.");
+          console.error(err);
+        } finally {
+          if (isActive) setLoading(false);
+        }
+      };
 
-    loadInventories();
-  }, []);
+      loadInventories();
 
-  // show spinner while loading
+      return () => {
+        // cleanup khi màn hình mất focus
+        isActive = false;
+      };
+    }, [])
+  );
+
   if (loading) {
     return (
       <SafeAreaView
@@ -74,7 +79,7 @@ const BunkerScreen: React.FC = () => {
 
   const cellSize = (width / cols) * 0.97;
 
-  // existing logic to insert “Add” button after the last filled cell
+  // chèn nút ADD ngay sau cell cuối cùng có dữ liệu
   const lastFilledIndex = grid.reduce(
     (last, cell, idx) => (cell ? idx : last),
     -1
@@ -82,131 +87,78 @@ const BunkerScreen: React.FC = () => {
   const insertIndex = lastFilledIndex + 1;
   const gridData = [
     ...grid.slice(0, insertIndex),
-    "ADD_BUTTON",
+    "ADD_BUTTON" as any,
     ...grid.slice(insertIndex),
   ].slice(0, maxCells);
 
-  // Navigate to “create new inventory” screen
   const handleAddPress = () => {
     router.push({
-      pathname: "/inventory/edit",
+      pathname: "/inventory/varieties",
       params: { mode: "create" },
     });
   };
 
-  // Navigate to “view/edit” screen for a given inventory item
-  // Ở màn list
-  const handleDetailInvenPress = (item: PlantInventory) => {
-    router.push({
-      pathname: "/inventory/edit",
-      params: {
-        mode: "read",
-        // JSON.stringify() thành một chuỗi
-        inventory: JSON.stringify(item),
-      },
-    });
+  const handleDetailPress = (item: PlantInventoryEntry) => {
+    router.push(`/inventory/${item.plantVariety.id}`);
   };
-
-  const handleDeletePress = async (id: string) => {
-    if (!id) return;
-
-    /* your existing long-press logic… */
-
-    try {
-      const msg = await deletePlantInventories([id]);
-      showSuccess(msg);
-      setGrid((prev) =>
-        prev.map((cell) => (cell && cell.id === id ? null : cell))
-      );
-    } catch (err) {
-      showError("Failed to delete inventory item.");
-    }
-  };
-
-  const toggleAction = (key: "remove") => {
-    setAction((prev) => (prev === key ? null : key));
-  };
-
+  const total = grid.filter((c) => c !== null).length;
   return (
     <SafeAreaView style={styles.container}>
       <Header title="Plant Inventory" showBack />
       <View style={styles.toolbar}>
         <Text>
-          Total: {gridData.filter((c) => c !== null).length - 1} / {maxCells}
+          Total: {total} / {maxCells}
         </Text>
-        <TouchableOpacity
-          style={[
-            styles.actionItem,
-            action === "remove" && styles.actionActive,
-          ]}
-          onPress={() => toggleAction("remove")}
-        >
-          <Text style={styles.actionText}>Remove</Text>
-        </TouchableOpacity>
       </View>
 
       <FlatList
         data={gridData}
+        numColumns={cols}
+        keyExtractor={(_, idx) => idx.toString()}
+        contentContainerStyle={styles.grid}
         renderItem={({ item, index }) => {
-          if (item === "ADD_BUTTON") {
+          // nút thêm mới
+          if (item === ("ADD_BUTTON" as any) && maxCells > total) {
             return (
               <TouchableOpacity
                 style={[styles.cell, { width: cellSize, height: cellSize }]}
-                onPress={() => handleAddPress()}
+                onPress={handleAddPress}
                 activeOpacity={0.7}
               >
                 <Text style={styles.addIcon}>+</Text>
               </TouchableOpacity>
             );
           }
-          const icon = grid[index];
-          const seq = icon
-            ? grid.slice(0, index + 1).filter((c) => c).length
-            : null;
+
+          const entry = grid[index];
+          if (!entry) {
+            return (
+              <View
+                style={[styles.cell, { width: cellSize, height: cellSize }]}
+              />
+            );
+          }
+
+          const { plantVariety, numberOfVariety } = entry;
           return (
             <Pressable
-              key={index}
               style={[styles.cell, { width: cellSize, height: cellSize }]}
-              // onPress={() => handleCellPress(index)}
-              // onLongPress={() => handleCellLongPress(index)}
+              onPress={() => handleDetailPress(entry)}
             >
-              {icon && (
-                <>
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (action !== "remove") handleDetailInvenPress(icon);
-                      else {
-                        handleDeletePress(icon.id);
-                      }
-                    }}
-                    style={styles.iconWrapper}
-                  >
-                    <Image
-                      source={{ uri: icon.imageUrl }}
-                      style={{ width: "100%", height: "100%", borderRadius: 8 }}
-                    />
-                    <Text
-                      className="absolute right-0 top-0 "
-                      style={{
-                        fontSize: 18,
-                        fontWeight: "bold",
-                        color: "white",
-                      }}
-                    >
-                      X {icon.inventoryQuantity}
-                    </Text>
-                    <Text className="absolute color-zinc-50 font-bold bottom-0">
-                      {icon.name}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
+              <View style={styles.iconWrapper}>
+                <Image
+                  source={{ uri: plantVariety.iconLink }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: 8,
+                  }}
+                />
+                <Text style={styles.quantityBadge}>X {numberOfVariety}</Text>
+              </View>
             </Pressable>
           );
         }}
-        keyExtractor={(_, idx) => idx.toString()}
-        numColumns={cols}
-        contentContainerStyle={styles.grid}
       />
     </SafeAreaView>
   );
@@ -214,7 +166,6 @@ const BunkerScreen: React.FC = () => {
 
 export default BunkerScreen;
 
-// your existing StyleSheet stays exactly the same
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   toolbar: {
@@ -224,37 +175,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  actionItem: {
-    padding: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionText: { fontSize: 16, color: "#333" },
-  actionActive: { backgroundColor: "#ddd", borderRadius: 4 },
   grid: { alignItems: "center" },
   cell: {
     borderWidth: 1,
     borderColor: "#ccc",
+    margin: 2,
     alignItems: "center",
     justifyContent: "center",
-    margin: 2,
   },
   iconWrapper: {
     width: "90%",
     height: "90%",
-    backgroundColor: "#fff",
-    alignItems: "center",
+    backgroundColor: "#000",
+
+    overflow: "hidden",
     justifyContent: "center",
-    borderRadius: 8,
-  },
-  iconText: { fontSize: 28 },
-  seqText: {
-    position: "absolute",
-    bottom: 4,
-    right: 4,
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#333",
+    alignItems: "center",
   },
   addIcon: { fontSize: 36, color: "#007bff" },
+  quantityBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 4,
+    borderRadius: 4,
+  },
+  nameLabel: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#fff",
+  },
 });

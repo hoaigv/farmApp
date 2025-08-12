@@ -5,6 +5,7 @@ export interface CreateGardenRequest {
   name: string;
   rowLength: number;
   colLength: number;
+  soil: string;
 }
 
 // Response mẫu từ API (theo hình bạn gửi chỉ có message)
@@ -15,6 +16,7 @@ export interface CreateGardenResponse {
     name: string;
     rowLength: number;
     colLength: number;
+    soil: string;
     gardenCondition: "NORMAL" | "OTHER_CONDITIONS"; // Thêm các giá trị khác nếu có
     userId: string;
   };
@@ -60,13 +62,13 @@ export interface GardenSummary {
   rowLength: number;
   colLength: number;
   gardenCondition: string;
+  soil: string;
   userId: string;
   cellCount: number;
   logCount: number;
   reminderCount: number;
   noteCount: number;
   activityCount: number;
-  aiSuggestionCount: number;
 }
 
 /** Response của GET /api/gardens */
@@ -87,12 +89,8 @@ export interface ListGardensResponse {
  * @param params Các tham số query (page, size, filters,...)
  * @returns Promise<ListGardensResponse>
  */
-export const fetchGardens = async (
-  params: ListGardensParams
-): Promise<ListGardensResponse> => {
-  const response = await axiosInstance.get<ListGardensResponse>("/gardens/me", {
-    params,
-  });
+export const fetchGardens = async (): Promise<ListGardensResponse> => {
+  const response = await axiosInstance.get<ListGardensResponse>("/gardens/me");
 
   return response.data;
 };
@@ -121,6 +119,7 @@ export const deleteGardens = async (
 export interface UpdateGardenRequest {
   id: string;
   name?: string; // Tên mới, nếu không có thì giữ nguyên
+  soil?: string; // Loại đất mới, nếu không có thì giữ nguyên
 }
 export interface UpdateGardenResponse {
   message: string; // "Garden updated successfully"

@@ -1,5 +1,4 @@
-// src/screens/ProfileScreen.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Image,
   Pressable,
@@ -7,45 +6,67 @@ import {
   Text,
   View,
   Alert,
+  Switch,
 } from "react-native";
 import { logout } from "../../store/authSlice";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import ChangePasswordModal from "../../components/PasswordModal";
-import { changePassword } from "../../api/userApi"; // Import hàm đổi mật khẩu từ authApi
-// Import các icon từ @expo/vector-icons
+import { changePassword } from "../../api/userApi";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import Octicons from "@expo/vector-icons/Octicons";
+import Fontisto from "@expo/vector-icons/Fontisto";
+// 📍 Import Location Modal & Storage
+import LocationPickerModal from "../../components/LocationPickerModal";
+import { getLocation } from "@/store/LocationStorage";
+import { useRouter } from "expo-router";
 
 const ProfileScreen = () => {
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
+
   const [modalVisible, setModalVisible] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+
+  const toggleSwitch = () => setIsEnabled((prev) => !prev);
+
+  // Lấy vị trí đã lưu từ AsyncStorage khi load screen
+  useEffect(() => {
+    const fetchLocation = async () => {
+      const stored = await getLocation();
+      if (stored) setSelectedLocation(stored);
+    };
+    fetchLocation();
+  }, []);
+
   const handleChangePassword = async (data: {
     oldPassword: string;
     newPassword: string;
     confirmPassword: string;
   }) => {
     try {
-      // 👉 Gọi API đổi mật khẩu
       const res = await changePassword({
         oldPassword: data.oldPassword,
         password: data.newPassword,
         confirmPassword: data.confirmPassword,
       });
-
-      // If the API returns a message, you can show it
       Alert.alert("Success", res.message || "Password updated");
       setModalVisible(false);
     } catch (err: any) {
-      // Catch and display errors
       const msg =
         err.response?.data?.message ||
         err.message ||
         "An error occurred, please try again";
       Alert.alert("Error", msg);
     }
+  };
+
+  const handleLocationSaved = (location: string) => {
+    setSelectedLocation(location);
   };
 
   return (
@@ -67,14 +88,22 @@ const ProfileScreen = () => {
 
       {/* Menu Items */}
       <View className="border-t border-gray-200">
-        <Pressable className="flex-row items-center px-6 py-4 border-b border-gray-100">
+        {/* 🌍 Location Picker */}
+        <Pressable
+          className="flex-row items-center px-6 py-4 border-b border-gray-100"
+          onPress={() => setLocationModalVisible(true)}
+        >
           <AntDesign
             name="enviromento"
             size={20}
             color="#4B5563"
             style={{ marginRight: 16 }}
           />
-          <Text className="text-base text-gray-800">Addresses</Text>
+          <View className="flex-row justify-between items-center flex-1">
+            <Text className="text-base text-gray-800">
+              {selectedLocation ? selectedLocation : "Addresses"}
+            </Text>
+          </View>
         </Pressable>
 
         <Pressable
@@ -87,7 +116,6 @@ const ProfileScreen = () => {
             color="black"
             style={{ marginRight: 16 }}
           />
-
           <Text className="text-base text-gray-800">Password</Text>
         </Pressable>
 
@@ -96,14 +124,15 @@ const ProfileScreen = () => {
           onDismiss={() => setModalVisible(false)}
           onSubmit={handleChangePassword}
         />
+
         <Pressable className="flex-row items-center px-6 py-4 border-b border-gray-100">
-          <FontAwesome5
-            name="money-bill-wave"
-            size={18}
+          <Octicons
+            name="versions"
+            size={20}
             color="#4B5563"
             style={{ marginRight: 16 }}
           />
-          <Text className="text-base text-gray-800">Transactions</Text>
+          <Text className="text-base text-gray-800">Version</Text>
         </Pressable>
 
         <Pressable className="flex-row items-center px-6 py-4 border-b border-gray-100">
@@ -114,33 +143,47 @@ const ProfileScreen = () => {
             style={{ marginRight: 16 }}
           />
           <Text className="text-base text-gray-800">Notifications</Text>
+          <Switch
+            value={isEnabled}
+            onValueChange={toggleSwitch}
+            className="ml-auto"
+            trackColor={{ false: "#d1d5db", true: "#4ade80" }}
+            thumbColor={isEnabled ? "#10b981" : "#f4f3f4"}
+          />
         </Pressable>
-
-        <Pressable className="flex-row items-center px-6 py-4 border-b border-gray-100">
-          <Ionicons
-            name="settings-outline"
+        <Pressable
+          onPress={() => router.push("/forum/history")}
+          className="flex-row items-center px-6 py-4 border-b border-gray-100"
+        >
+          <Fontisto
+            name="history"
             size={20}
             color="#4B5563"
             style={{ marginRight: 16 }}
           />
-          <Text className="text-base text-gray-800">Settings</Text>
+          <Text className="text-base text-gray-800">History Posts</Text>
         </Pressable>
 
-        <Pressable className="flex-row items-center px-6 py-4 border-b border-gray-100">
-          <Ionicons
-            name="person-outline"
+        <Pressable
+          onPress={() => dispatch(logout())}
+          className="flex-row items-center px-6 py-4 border-b border-gray-100"
+        >
+          <MaterialIcons
+            name="logout"
             size={20}
             color="#4B5563"
             style={{ marginRight: 16 }}
           />
-          <Text className="text-base text-gray-800">About Me</Text>
+          <Text className="text-green-600 font-medium">Logout</Text>
         </Pressable>
       </View>
 
-      {/* Sign Out */}
-      <Pressable onPress={() => dispatch(logout())} className="px-6 py-5">
-        <Text className="text-green-600 font-medium">Sign Out</Text>
-      </Pressable>
+      {/* 📍 Location Picker Modal */}
+      <LocationPickerModal
+        visible={locationModalVisible}
+        onDismiss={() => setLocationModalVisible(false)}
+        onLocationSaved={handleLocationSaved}
+      />
     </SafeAreaView>
   );
 };

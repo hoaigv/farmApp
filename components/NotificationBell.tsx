@@ -9,7 +9,7 @@ const NotificationBell = () => {
   return (
     <>
       <TouchableOpacity onPress={() => setVisible(true)}>
-        <View className="bg-primary rounded-full px-2 py-2 relative mr-2">
+        <View className="bg-primary rounded-full px-2 py-2 relative mr-2 border-gray-300 shadow-sm">
           <MaterialCommunityIcons name="bell" size={22} color="white" />
           <View
             className="absolute bg-red-600 rounded-full items-center justify-center"
@@ -21,7 +21,7 @@ const NotificationBell = () => {
               paddingHorizontal: 2,
             }}
           >
-            <Text className="text-[10px] text-white font-bold">99</Text>
+            <Text className="text-[10px] text-white font-bold">0</Text>
           </View>
         </View>
       </TouchableOpacity>
